@@ -66,7 +66,7 @@ Gem5SimControl::Gem5SimControl(sc_core::sc_module_name name,
     simulationEnd(simulationEnd)
 {
     SC_THREAD(run);
-
+    std::cout << ">>>> GEM5SimControl init" << std::endl;
     if (instance != nullptr) {
         panic("Tried to instantiate Gem5SimControl more than once!\n");
     }
@@ -87,9 +87,11 @@ Gem5SimControl::Gem5SimControl(sc_core::sc_module_name name,
                     == sc_core::sc_time(1,sc_core::SC_PS));
 
     Gem5SystemC::Module::setupEventQueues(*this);
+    std::cout << ">>> setupEventQueues Completed\n" << std::endl;
     gem5::initSignals();
 
     gem5::statistics::initSimStats();
+    std::cout << ">>> initSimStats Completed\n" << std::endl;
     gem5::statistics::registerHandlers(CxxConfig::statsReset,
         CxxConfig::statsDump);
 

@@ -30,6 +30,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <iostream>
 #include <systemc>
 #include <tlm>
 
@@ -43,6 +44,7 @@
 int
 sc_main(int argc, char** argv)
 {
+    std::cout << ">>>> Master test start " << std::endl;
     CliParser parser;
     parser.parse(argc, argv);
 

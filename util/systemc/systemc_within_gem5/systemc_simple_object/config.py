@@ -55,3 +55,4 @@ m5.instantiate(None)
 
 cause = m5.simulate(m5.MaxTick).getCause()
 print(cause)
+

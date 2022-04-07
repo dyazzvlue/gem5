@@ -98,7 +98,7 @@ class Gem5SimControl : public Module, public Gem5SimControlInterface
      *
      * This class has a public constructor although the class is actually a
      * singleton. The public constructor is required to ensure compatibility
-     * to external SystemC based tools. For the same reason, the constructor
+     * to external System C based tools. For the same reason, the constructor
      * parameters are basic types (int, string).
      *
      * @param configFile     location of the gem5 configuration file

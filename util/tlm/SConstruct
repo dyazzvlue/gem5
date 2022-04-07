@@ -55,9 +55,10 @@ env.Append(CPPPATH=[gem5_root + '/build/' + gem5_arch,
                     '#examples/common',
                     ])
 
-env.Append(CXXFLAGS=['-std=c++14',
+env.Append(CXXFLAGS=['-std=c++17',
                      '-DSC_INCLUDE_DYNAMIC_PROCESSES',
                      '-DTRACING_ON',
+                     '-fPIC',
                      ])
 
 if gem5_variant == 'debug':
