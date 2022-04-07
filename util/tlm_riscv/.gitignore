@@ -1,0 +1,3 @@
+*.o
+.sconsign.dblite
+build2.3.3
