@@ -99,7 +99,9 @@ def define_options(parser):
     eval("%s.define_options(parser)" % protocol)
     Network.define_options(parser)
 
-def setup_memory_controllers(system, ruby, dir_cntrls, options):
+def setup_memory_controllers(system, ruby, dir_cntrls, options,
+                            _mem_ctrl = None, mem_addr_range = None,
+                            memory_side_port = None):
     if (options.numa_high_bit):
         block_size_bits = options.numa_high_bit + 1 - \
                           int(math.log(options.num_dirs, 2))
@@ -133,36 +135,50 @@ def setup_memory_controllers(system, ruby, dir_cntrls, options):
             dir_cntrl.memory = crossbar.cpu_side_ports
 
         dir_ranges = []
-        for r in system.mem_ranges:
-            mem_type = ObjectList.mem_list.get(options.mem_type)
-            dram_intf = MemConfig.create_mem_intf(mem_type, r, index,
-                int(math.log(options.num_dirs, 2)),
-                intlv_size, options.xor_low_bit)
-            if issubclass(mem_type, DRAMInterface):
-                mem_ctrl = m5.objects.MemCtrl(dram = dram_intf)
-            else:
-                mem_ctrl = dram_intf
+        if _mem_ctrl == None:
+            for r in system.mem_ranges:
+                print("debug")
+                mem_type = ObjectList.mem_list.get(options.mem_type)
+                dram_intf = MemConfig.create_mem_intf(mem_type, r, index,
+                    int(math.log(options.num_dirs, 2)),
+                    intlv_size, options.xor_low_bit)
+                print(dram_intf.range)
+                if issubclass(mem_type, DRAMInterface):
+                    print("debug1")
+                    mem_ctrl = m5.objects.MemCtrl(dram = dram_intf)
+                else:
+                    print("debug2")
+                    mem_ctrl = dram_intf
 
-            if options.access_backing_store:
-                dram_intf.kvm_map=False
+                if options.access_backing_store:
+                    dram_intf.kvm_map=False
 
-            mem_ctrls.append(mem_ctrl)
-            dir_ranges.append(dram_intf.range)
+                mem_ctrls.append(mem_ctrl)
+                dir_ranges.append(dram_intf.range)
 
-            if crossbar != None:
-                mem_ctrl.port = crossbar.mem_side_ports
-            else:
-                mem_ctrl.port = dir_cntrl.memory
+                if crossbar != None:
+                    print("debug3")
+                    mem_ctrl.port = crossbar.mem_side_ports
+                else:
+                    print("debug4")
+                    mem_ctrl.port = dir_cntrl.memory
 
-            # Enable low-power DRAM states if option is set
-            if issubclass(mem_type, DRAMInterface):
-                mem_ctrl.dram.enable_dram_powerdown = \
-                        options.enable_dram_powerdown
+                # Enable low-power DRAM states if option is set
+                if issubclass(mem_type, DRAMInterface):
+                    mem_ctrl.dram.enable_dram_powerdown = \
+                            options.enable_dram_powerdown
+        else:
+            # using memory_ctrl and related port
+            print ("using given memory")
+            mem_ctrls.append(_mem_ctrl)
+            dir_ranges.append(mem_addr_range)
+            dir_cntrl.memory = memory_side_port
 
         index += 1
         dir_cntrl.addr_ranges = dir_ranges
 
-    system.mem_ctrls = mem_ctrls
+    if _mem_ctrl == None:
+        system.mem_ctrls = mem_ctrls
 
     if len(crossbars) > 0:
         ruby.crossbars = crossbars
@@ -179,7 +195,8 @@ def create_topology(controllers, options):
     return topology
 
 def create_system(options, full_system, system, piobus = None, dma_ports = [],
-                  bootmem=None, cpus=None):
+                  bootmem=None, cpus=None, _mem_ctrl = None,
+                  mem_addr_range = None, memory_side_port = None):
 
     system.ruby = RubySystem()
     ruby = system.ruby
@@ -196,6 +213,7 @@ def create_system(options, full_system, system, piobus = None, dma_ports = [],
         cpus = system.cpu
 
     protocol = buildEnv['PROTOCOL']
+    print(protocol)
     exec("from . import %s" % protocol)
     try:
         (cpu_sequencers, dir_cntrls, topology) = \
@@ -214,7 +232,6 @@ def create_system(options, full_system, system, piobus = None, dma_ports = [],
     if not full_system:
         topology.registerTopology(options)
 
-
     # Initialize network based on topology
     Network.init_network(options, network, InterfaceClass)
 
@@ -232,7 +249,8 @@ def create_system(options, full_system, system, piobus = None, dma_ports = [],
     # Connect the system port for loading of binaries etc
     system.system_port = system.sys_port_proxy.in_ports
 
-    setup_memory_controllers(system, ruby, dir_cntrls, options)
+    setup_memory_controllers(system, ruby, dir_cntrls, options,
+                            _mem_ctrl, mem_addr_range, memory_side_port)
 
     # Connect the cpu sequencers and the piobus
     if piobus != None:

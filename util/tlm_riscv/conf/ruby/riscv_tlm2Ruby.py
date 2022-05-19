@@ -43,25 +43,31 @@ import m5
 from m5.objects import *
 from m5.util import addToPath, fatal, warn
 
-addToPath('../../../configs')
+# for debug
+from m5.ticks import *
 
-# set cpu num
+addToPath('../../../../configs')
+addToPath('../../../../configs/common/')
 from common import Options
+#from Caches import *
+from msi_caches import MyCacheSystem
+from common.FileSystemConfig import config_filesystem
 
 parser = argparse.ArgumentParser()
 Options.addCommonOptions(parser)
 Options.addSEOptions(parser)
 
 # testcase
-parser.add_argument("--testcase", default="test1",
+parser.add_argument("--testcase", default="",
                     dest='testcase',
                     choices=["test1","test2"],
                     help="simple test case")
 
 args = parser.parse_args()
-np = args.num_cpus
-# np = 2
+#np = args.num_cpus
+np = 2
 testcase = args.testcase
+#print(testcase)
 
 multiprocesses =[]
 multibinary = []
@@ -73,10 +79,16 @@ system.clk_domain = SrcClockDomain()
 system.clk_domain.clock = '1GHz'
 system.clk_domain.voltage_domain = VoltageDomain()
 
-# Create a simple CPU
+system.mem_mode = 'timing'
+system.mem_ranges = [AddrRange('512MB')]
+
+# Create a simple CPU and its L1 L2 caches
 #system.cpu = TimingSimpleCPU()
-#system.cpu = [TimingSimpleCPU(cpu_id=i) for i in range(np)]
-system.cpu = [O3CPU(cpu_id=i) for i in range(np)]
+system.cpu = [TimingSimpleCPU(cpu_id=i) for i in range(np)]
+
+# create the interrupt controller for the CPU and connect to the membus
+for i in range(np):
+    system.cpu[i].createInterruptController()
 
 # Create a memory bus, a system crossbar, in this case
 system.membus = SystemXBar()
@@ -88,19 +100,28 @@ system.physmem = SimpleMemory()
 # Create a external TLM port:
 system.tlm = ExternalSlave()
 system.tlm.addr_ranges = [AddrRange('512MB')]
+#system.tlm.range = system.mem_ranges[0]
 system.tlm.port_type = "tlm_slave"
 system.tlm.port_data = "transactor"
 
 #system.cpu.port = system.membus.slave
-system.system_port = system.membus.cpu_side_ports
+# system.system_port = system.membus.cpu_side_ports
 system.membus.mem_side_ports = system.tlm.port
 
 # Hook the CPU ports up to the membus (membus.slave)
 for i in range(np):
-    system.cpu[i].icache_port = system.membus.cpu_side_ports
-    system.cpu[i].dcache_port = system.membus.cpu_side_ports
+    #system.cpu[i].icache_port = system.membus.cpu_side_ports
+    #system.cpu[i].dcache_port = system.membus.cpu_side_ports
     # create the interrupt controller for the CPU and connect to the membus
     system.cpu[i].createInterruptController()
+
+# Create Ruby Cache
+system.caches = MyCacheSystem()
+print(">>> Create cache system")
+system.caches.setup(system, system.cpu,
+                    [system.tlm], system.membus.cpu_side_ports)
+#system.caches.setup(system, system.cpu, [system.mem_ctrl])
+print(">>> Create cache system complete")
 
 # get ISA for the binary to run.
 isa = str(m5.defines.buildEnv['TARGET_ISA']).lower()
@@ -112,21 +133,23 @@ thispath = os.path.dirname(os.path.realpath(__file__))
 # abort with ExtraData invaild error
 #binary = os.path.join(thispath, '../../../',
 #                      'tests/test-progs/hello/bin/', isa, 'linux/hello')
-
 # pass test
-#binary1 = "/home/pzy/Documents/Spike/spike-testing/hello/rv64_hello"
-#binary2 = "/home/pzy/Documents/Spike/spike-testing/test1/riscv64-test1"
 
-binary1 = os.path.join(thispath, '../', 'testcase/array_add/riscv64-test1')
-binary2 = os.path.join(thispath, '../', 'testcase/array_add/riscv64-test2')
+binary1 = os.path.join(thispath, '../../', 'testcase/array_add/riscv64-test1')
+binary2 = os.path.join(thispath, '../../', 'testcase/array_add/riscv64-test2')
 
-binary3 = os.path.join(thispath, '../', 'testcase/cache/main')
-binary4 = os.path.join(thispath, '../', 'testcase/cache/test1')
-binary5 = os.path.join(thispath, '../', 'testcase/cache/test2')
-binary6 = os.path.join(thispath, '../', 'testcase/hello/rv64_hello')
+binary3 = os.path.join(thispath, '../../', 'testcase/cache/main')
+binary4 = os.path.join(thispath, '../../', 'testcase/cache/test1')
+binary5 = os.path.join(thispath, '../../', 'testcase/cache/test2')
+
+binary6 = os.path.join(thispath, '../../', 'testcase/array_add_2/x86_test1')
+
+binary_test = os.path.join(thispath, "../../",
+                    "testcase/array_add_2/riscv_test_new")
 
 multibinary.append(binary1)
 multibinary.append(binary2)
+multibinary.append(binary3)
 
 for i in range(np):
     # Create a process for a simple "Hello World" application
@@ -136,7 +159,15 @@ for i in range(np):
     if (np > 1):
         process.cmd = [multibinary[i]]
     else:
-        process.cmd = [binary6]
+        if (testcase == "test1"):
+            print("Run " + binary4)
+            process.cmd = [binary4]
+        elif (testcase == "test2"):
+            print("Run " + binary5)
+            process.cmd = [binary5]
+        else:
+            print("Run default")
+            process.cmd = [binary_test]
     multiprocesses.append(process)
     # Set the cpu to use the process as its workload and create thread contexts
     system.cpu[i].workload = multiprocesses[i]
@@ -147,16 +178,19 @@ if (np > 1 ):
     #system.workload = SEWorkload.init_compatible(mp0_path)
     system.workload = SEWorkload.init_compatible(binary1)
 else:
-    system.workload = SEWorkload.init_compatible(binary6)
+    system.workload = SEWorkload.init_compatible(binary_test)
 
 # set up the root SimObject and start the simulation
 root = Root(full_system = False, system = system)
-root.system.mem_mode = 'timing'
-
+#root.system.mem_mode = 'timing'
+print(">>> prepare to instantiate")
 # instantiate all of the objects we've created above
+#_test_instantiate(None, root)
+#print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 m5.instantiate()
-
+print(">>> instantiate complete")
 #print("Beginning simulation!")
 #exit_event = m5.simulate()
 m5.simulate()
 #print('Exiting @ tick %i because %s' % (m5.curTick(), exit_event.getCause()))
+

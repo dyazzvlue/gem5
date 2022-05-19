@@ -9,7 +9,7 @@ int add(int a, int b){
 void sampleFunc(int a[], int b[]){
     for (int i =0 ; i< VEC_SIZE; i ++){
         int c = add(a[i], b[i]);
-        printf("[User function 2]Return c: %d\n", c);
+        printf("[User function]Return c: %d\n", c);
     }
 }
 
@@ -17,12 +17,12 @@ void sampleFunc(int a[], int b[]){
 int main(){
     int an[VEC_SIZE];
     int bn[VEC_SIZE];
-    printf("[User function 2]Init an, bn\n");
+    printf("[User function1]Init an, bn\n");
     for (int i = 0; i < VEC_SIZE ; i ++){
         an[i] = i;
         bn[i] = i+i;
     }
-    printf("[User function 2]run sample\n");
+    printf("[User function]run sample\n");
     sampleFunc(an, bn);
     return 0;
 }

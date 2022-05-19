@@ -1,3 +1,4 @@
 *.o
 .sconsign.dblite
+*.log
 build2.3.3

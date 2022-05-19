@@ -52,16 +52,9 @@ parser = argparse.ArgumentParser()
 Options.addCommonOptions(parser)
 Options.addSEOptions(parser)
 
-# testcase
-parser.add_argument("--testcase", default="test1",
-                    dest='testcase',
-                    choices=["test1","test2"],
-                    help="simple test case")
-
 args = parser.parse_args()
 np = args.num_cpus
 # np = 2
-testcase = args.testcase
 
 multiprocesses =[]
 multibinary = []
@@ -75,25 +68,25 @@ system.clk_domain.voltage_domain = VoltageDomain()
 
 # Create a simple CPU
 #system.cpu = TimingSimpleCPU()
-#system.cpu = [TimingSimpleCPU(cpu_id=i) for i in range(np)]
-system.cpu = [O3CPU(cpu_id=i) for i in range(np)]
+system.cpu = [TimingSimpleCPU(cpu_id=i) for i in range(np)]
 
 # Create a memory bus, a system crossbar, in this case
 system.membus = SystemXBar()
 # system.membus = IOXBar(width = 16)
 
 # This must be instantiated when using systemc cosim, even if not needed
-system.physmem = SimpleMemory()
+#system.physmem = SimpleMemory()
+system.physmem = SimpleMemory(range = AddrRange('512MB'))
 
 # Create a external TLM port:
-system.tlm = ExternalSlave()
-system.tlm.addr_ranges = [AddrRange('512MB')]
-system.tlm.port_type = "tlm_slave"
-system.tlm.port_data = "transactor"
+#system.tlm = ExternalSlave()
+#system.tlm.addr_ranges = [AddrRange('512MB')]
+#system.tlm.port_type = "tlm_slave"
+#system.tlm.port_data = "transactor"
 
 #system.cpu.port = system.membus.slave
 system.system_port = system.membus.cpu_side_ports
-system.membus.mem_side_ports = system.tlm.port
+system.membus.mem_side_ports = system.physmem.port
 
 # Hook the CPU ports up to the membus (membus.slave)
 for i in range(np):
@@ -120,13 +113,17 @@ thispath = os.path.dirname(os.path.realpath(__file__))
 binary1 = os.path.join(thispath, '../', 'testcase/array_add/riscv64-test1')
 binary2 = os.path.join(thispath, '../', 'testcase/array_add/riscv64-test2')
 
-binary3 = os.path.join(thispath, '../', 'testcase/cache/main')
-binary4 = os.path.join(thispath, '../', 'testcase/cache/test1')
-binary5 = os.path.join(thispath, '../', 'testcase/cache/test2')
-binary6 = os.path.join(thispath, '../', 'testcase/hello/rv64_hello')
+binary3 = os.path.join(thispath, '../', 'testcase/array_add_2/riscv_test_new')
+binary4 = os.path.join(thispath, '../',
+                       'testcase/array_add_2/riscv_test_new_2')
+
+binary5 = os.path.join(thispath, '../', 'testcase/threads/main')
 
 multibinary.append(binary1)
 multibinary.append(binary2)
+multibinary.append(binary3)
+multibinary.append(binary4)
+multibinary.append(binary5)
 
 for i in range(np):
     # Create a process for a simple "Hello World" application
@@ -134,12 +131,14 @@ for i in range(np):
     # Set the command
     # cmd is a list which begins with the executable (like argv)
     if (np > 1):
-        process.cmd = [multibinary[i]]
+        # process.cmd = [multibinary[i]]
+        process.cmd = [multibinary[4]]
     else:
-        process.cmd = [binary6]
+        process.cmd = [binary1]
     multiprocesses.append(process)
     # Set the cpu to use the process as its workload and create thread contexts
-    system.cpu[i].workload = multiprocesses[i]
+    #system.cpu[i].workload = multiprocesses[i]
+    system.cpu[i].workload = process
     system.cpu[i].createThreads()
 
 if (np > 1 ):
@@ -147,7 +146,7 @@ if (np > 1 ):
     #system.workload = SEWorkload.init_compatible(mp0_path)
     system.workload = SEWorkload.init_compatible(binary1)
 else:
-    system.workload = SEWorkload.init_compatible(binary6)
+    system.workload = SEWorkload.init_compatible(binary5)
 
 # set up the root SimObject and start the simulation
 root = Root(full_system = False, system = system)

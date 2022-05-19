@@ -35,6 +35,31 @@ IMPORTANT: If you modify this file, it's likely that the Learning gem5 book
 
 """
 
+# Base System Architecture:
+# +-------------+  +-----------+    ^
+# | System Port |  | TimingCPU |    |
+# +-------+-----+  +-----+-----+    |
+#         |        | $D1 | $I1 |    |
+#         |        +--+--+--+--+    |
+#         |           |     |       | gem5 World
+#         |        +--v-----v--+    |
+#         |        | toL2Bus   |    |
+#         |        +-----+-----+    |
+#         |              |          |
+#         |        +-----v-----+    |
+#         |        |    L2     |    |
+#         |        +-----+-----+    |
+#         |              |          |
+#         |              |          |
+# +-------v--------------v-----+    |
+# |        Membus        |          v
+# +----------------+-----+           External Port (see sc_slave_port.*)
+#                  |                ^
+#              +---v---+            | TLM World
+#              |  TLM  |            | (see sc_target.*)
+#              +-------+            v
+#
+
 import argparse
 
 # import the m5 (gem5) library created when gem5 is built
@@ -44,16 +69,16 @@ from m5.objects import *
 from m5.util import addToPath, fatal, warn
 
 addToPath('../../../configs')
-
-# set cpu num
+addToPath('../../../configs/common/')
 from common import Options
+from Caches import *
 
 parser = argparse.ArgumentParser()
 Options.addCommonOptions(parser)
 Options.addSEOptions(parser)
 
 # testcase
-parser.add_argument("--testcase", default="test1",
+parser.add_argument("--testcase", default="",
                     dest='testcase',
                     choices=["test1","test2"],
                     help="simple test case")
@@ -62,6 +87,7 @@ args = parser.parse_args()
 np = args.num_cpus
 # np = 2
 testcase = args.testcase
+#print(testcase)
 
 multiprocesses =[]
 multibinary = []
@@ -73,10 +99,26 @@ system.clk_domain = SrcClockDomain()
 system.clk_domain.clock = '1GHz'
 system.clk_domain.voltage_domain = VoltageDomain()
 
-# Create a simple CPU
+# Create a simple CPU and its L1 L2 caches
 #system.cpu = TimingSimpleCPU()
-#system.cpu = [TimingSimpleCPU(cpu_id=i) for i in range(np)]
-system.cpu = [O3CPU(cpu_id=i) for i in range(np)]
+system.cpu = [TimingSimpleCPU(cpu_id=i) for i in range(np)]
+
+system.tol2bus = [L2XBar() for i in range(np)]
+system.l2cache = [L2Cache(size="1MB") for i in range(np)]
+
+
+# Setting up CPU L1 caches and L2 caches
+for i in range(np):
+    system.cpu[i].createInterruptController()
+    system.cpu[i].icache = L1_ICache(size="32kB")
+    system.cpu[i].dcache = L1_DCache(size="32kB")
+    system.cpu[i].icache.cpu_side = system.cpu[i].icache_port
+    system.cpu[i].dcache.cpu_side = system.cpu[i].dcache_port
+    system.cpu[i].icache.mem_side = system.tol2bus[i].cpu_side_ports
+    system.cpu[i].dcache.mem_side = system.tol2bus[i].cpu_side_ports
+
+    system.tol2bus[i].mem_side_ports = system.l2cache[i].cpu_side
+    # Setting up L1 Bus
 
 # Create a memory bus, a system crossbar, in this case
 system.membus = SystemXBar()
@@ -97,8 +139,10 @@ system.membus.mem_side_ports = system.tlm.port
 
 # Hook the CPU ports up to the membus (membus.slave)
 for i in range(np):
-    system.cpu[i].icache_port = system.membus.cpu_side_ports
-    system.cpu[i].dcache_port = system.membus.cpu_side_ports
+    #system.cpu[i].icache_port = system.membus.cpu_side_ports
+    #system.cpu[i].dcache_port = system.membus.cpu_side_ports
+
+    system.l2cache[i].mem_side = system.membus.cpu_side_ports
     # create the interrupt controller for the CPU and connect to the membus
     system.cpu[i].createInterruptController()
 
@@ -114,8 +158,6 @@ thispath = os.path.dirname(os.path.realpath(__file__))
 #                      'tests/test-progs/hello/bin/', isa, 'linux/hello')
 
 # pass test
-#binary1 = "/home/pzy/Documents/Spike/spike-testing/hello/rv64_hello"
-#binary2 = "/home/pzy/Documents/Spike/spike-testing/test1/riscv64-test1"
 
 binary1 = os.path.join(thispath, '../', 'testcase/array_add/riscv64-test1')
 binary2 = os.path.join(thispath, '../', 'testcase/array_add/riscv64-test2')
@@ -123,10 +165,10 @@ binary2 = os.path.join(thispath, '../', 'testcase/array_add/riscv64-test2')
 binary3 = os.path.join(thispath, '../', 'testcase/cache/main')
 binary4 = os.path.join(thispath, '../', 'testcase/cache/test1')
 binary5 = os.path.join(thispath, '../', 'testcase/cache/test2')
-binary6 = os.path.join(thispath, '../', 'testcase/hello/rv64_hello')
 
 multibinary.append(binary1)
 multibinary.append(binary2)
+multibinary.append(binary3)
 
 for i in range(np):
     # Create a process for a simple "Hello World" application
@@ -136,7 +178,15 @@ for i in range(np):
     if (np > 1):
         process.cmd = [multibinary[i]]
     else:
-        process.cmd = [binary6]
+        if (testcase == "test1"):
+            print("Run " + binary4)
+            process.cmd = [binary4]
+        elif (testcase == "test2"):
+            print("Run " + binary5)
+            process.cmd = [binary5]
+        else:
+            print("Run default")
+            process.cmd = [binary1]
     multiprocesses.append(process)
     # Set the cpu to use the process as its workload and create thread contexts
     system.cpu[i].workload = multiprocesses[i]
@@ -147,7 +197,7 @@ if (np > 1 ):
     #system.workload = SEWorkload.init_compatible(mp0_path)
     system.workload = SEWorkload.init_compatible(binary1)
 else:
-    system.workload = SEWorkload.init_compatible(binary6)
+    system.workload = SEWorkload.init_compatible(binary1)
 
 # set up the root SimObject and start the simulation
 root = Root(full_system = False, system = system)
