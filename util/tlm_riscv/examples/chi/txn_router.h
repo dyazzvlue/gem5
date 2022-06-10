@@ -56,7 +56,7 @@ private:
        // std::cout << "[txn_router] b_transport " << std::endl;
         if (ToMem(trans)) {
          //   std::cout << sc_time_stamp() << " receive to mem request " << std::endl;
-            isock_mem->b_transport(trans, delay);
+            execute_transaction(trans);
         }
         else {
            // std::cout << sc_time_stamp() << " receive to mem request " << std::endl;
@@ -91,7 +91,6 @@ private:
           //  std::cout << sc_time_stamp() << " receive to mem request " << std::endl;
             m_peq.notify(trans, phase, delay);
             // should not forward directly
-            //return isock_mem->nb_transport_fw(trans, phase, delay);
         }
         else {
             SC_REPORT_FATAL("TXN_ROUTER", "Address out of range. Please check");
@@ -254,7 +253,7 @@ private:
 
 
 public:
-    // tsock is binded to cpu
+    // tsock <-> cpu_side_port (gem5 slave transactor)
     tlm_utils::simple_target_socket<TxnRouter> tsock;
     tlm_utils::simple_initiator_socket<TxnRouter> isock_mem;
     tlm_utils::simple_initiator_socket<TxnRouter> isock_bus;

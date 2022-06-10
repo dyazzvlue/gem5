@@ -66,6 +66,44 @@ using namespace sc_dt;
 
 #define CACHE_SIZE 256
 
+/*
+GEM5 <-> CHI interface
+System Architecture:
++------- ----+  +------- ----+      ^
+| TimingCPU0 |  | TimingCPU1 |      |
++------+-----+  +------+-----+      |
+       |               |            |
+       |               |            |
++------v-----+  +------v-----+      |gem5 World
+|  MemBus0   |  |  MemBus1   |      |
++-----+------+  +-----+------+      |
+      |               |             |
+      |               |             v
++-----v------+  +-----v------+      Exteral Port
+|Transactor0 |  |Transactor1 |      ^
++-----+------+  +-----+------+      |
+      |               |             | TLM world
+      |               |             |
++-----v------+  +-----v------+      ----------
+| chi-cache0 |  | chi-cache1 |      |
++-----+------+  +-----+------+      |
+      |               |             |
+      |               |             |
++-----v---------------v------+      |
+|     CHI Interconnet        |      |
++-------------+--------------+      | Xlinx CHI lib
+              |                     |
+              |                     |
++-------------v--------------+      |
+|         Slave node         |      |
++-------------+--------------+      |
+              |                     |
++-------------v--------------+      -----------
+|       Simple memory        |      | Memory model based on sc_module
++-------------+--------------+      v
+
+*/
+
 template<typename T1, typename T2>
 void connect_rn(T1& rn, T2& port_RN_F) {
         rn.txreq_init_socket(port_RN_F->rxreq_tgt_socket);
@@ -102,20 +140,21 @@ sc_main(int argc, char **argv)
     unsigned long long int mem_end_addr = mem_start_addr + memorySize - 1;
 
 
-    Gem5SystemC::Gem5SlaveTransactor transactor("transactor", "transactor");
+    Gem5SystemC::Gem5SlaveTransactor transactor0("transactor0", "transactor0");
+    Gem5SystemC::Gem5SlaveTransactor transactor1("transactor1", "transactor1");
 
     /*
         Setting external systemc world
 
     */
-    SimpleBus<1,1> bus("SimpleBus");
+    SimpleBus<2,1> bus("SimpleBus");
     bus.ports[0] = new PortMapping(mem_start_addr, mem_end_addr);
-    // TODO set mem_start_addr, mem_size
+
     TxnRouter txn_router0("txn_router0", mem_start_addr, memorySize);
-    //TxnRouter txn_router1("txn_router1", mem_start_addr, mem_size);
+    TxnRouter txn_router1("txn_router1", mem_start_addr, memorySize);
     // Using CHI cache model
     cache_chi<NODE_ID_RNF0, CACHE_SIZE> rnf0("rnf0");
-    //cache_chi<NODE_ID_RNF1, CACHE_SIZE> rnf1("rnf1");
+    cache_chi<NODE_ID_RNF1, CACHE_SIZE> rnf1("rnf1");
 
     iconnect_chi<> icn("iconnect_chi");
     SlaveNode_F<> sn("sn");
@@ -123,27 +162,25 @@ sc_main(int argc, char **argv)
     SimpleMemory mem("SimpleMemory", memorySize);
 
     // connect chi components
-    // core0_mem_if.isock(txn_router0.tsock);
-        // core1_mem_if.isock(txn_router1.tsock);
 
     // connenct gem5 world to txn_router
     bus.isocks[0].bind(mem.tsock);
-    transactor.socket.bind(txn_router0.tsock);
+    transactor0.socket.bind(txn_router0.tsock);
+    transactor1.socket.bind(txn_router1.tsock);
 
     txn_router0.isock_mem(rnf0.target_socket);
+    txn_router1.isock_mem(rnf1.target_socket);
 
-        //txn_router1.isock_mem(rnf1.target_socket);
-
-        txn_router0.isock_bus(bus.tsocks[0]);
-
-        //txn_router1.isock_bus(bus.tsocks[1]);
+    txn_router0.isock_bus(bus.tsocks[0]);
+    txn_router1.isock_bus(bus.tsocks[1]);
 
     connect_rn(rnf0, icn.port_RN_F[0]);
+    connect_rn(rnf1, icn.port_RN_F[1]);
 
         //connect_rn(rnf1, icn.port_RN_F[1]);
-        connect_sn(sn, icn.port_SN);
+    connect_sn(sn, icn.port_SN);
 
-        sn.init_socket(mem.tsock_sn);
+    sn.init_socket(mem.tsock_sn);
 
 
     /*
@@ -155,7 +192,8 @@ sc_main(int argc, char **argv)
     memory.socket.bind(transactor.socket);
     */
 
-    transactor.sim_control.bind(sim_control);
+    transactor0.sim_control.bind(sim_control);
+    transactor1.sim_control.bind(sim_control);
 
     SC_REPORT_INFO("sc_main", "Start of Simulation");
 

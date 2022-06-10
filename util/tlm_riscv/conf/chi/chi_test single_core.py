@@ -47,43 +47,28 @@ np = args.num_cpus
 multiprocesses =[]
 multibinary = []
 
+# This configuration shows a simple setup of a TrafficGen (CPU) and an
+# external TLM port for SystemC co-simulation
 #
-# +------- ----+  +------- ----+      ^
-# | TimingCPU0 |  | TimingCPU1 |      |
-# +------+-----+  +------+-----+      |
-#        |               |            |
-#        |               |            |
-# +------v-----+  +------v-----+      |gem5 World
-# |  MemBus0   |  |  MemBus1   |      |
-# +-----+------+  +-----+------+      |
-#       |               |             |
-#       |               |             v
-# +-----v------+  +-----v------+      Exteral Port
-# |Transactor0 |  |Transactor1 |      ^
-# +-----+------+  +-----+------+      |
-#       |               |             | TLM world
-#       |               |             |
-# +-----v------+  +-----v------+      ----------
-# | chi-cache0 |  | chi-cache1 |      |
-# +-----+------+  +-----+------+      |
-#       |               |             |
-#       |               |             |
-# +-----v---------------v------+      |
-# |     CHI Interconnet        |      |
-# +-------------+--------------+      | Xlinx CHI lib
-#               |                     |
-#               |                     |
-# +-------------v--------------+      |
-# |         Slave node         |      |
-# +-------------+--------------+      |
-#               |                     |
-# +-------------v--------------+      -----------
-# |       Simple memory        |      | Memory model based on sc_module
-# +-------------+--------------+      v
+# Base System Architecture:
+# +-------------+  +-----+    ^
+# | System Port |  | CPU |    |
+# +-------+-----+  +--+--+    |
+#         |           |       | gem5 World
+#         |      +----+       | (see this file)
+#         |      |            |
+# +-------v------v-------+    |
+# |        Membus        |    v
+# +----------------+-----+    External Port (see sc_slave_port.*)
+#                  |          ^
+#              +---v---+      | TLM World
+#              |  TLM  |      | (see sc_target.*)
+#              +-------+      v
+#
 
 # Create a system with a Crossbar and a TrafficGenerator as CPU:
 system = System()
-system.membus = [SystemXBar(width = 16) for i in range(np)]
+system.membus = SystemXBar(width = 16)
 
 system.physmem = SimpleMemory() # This must be instanciated, even if not needed
 
@@ -98,26 +83,18 @@ binary = os.path.join(thispath, '../../', 'testcase/hello/rv64_hello')
 multibinary.append(binary)
 
 # Create a external TLM port:
-system.tlm0 = ExternalSlave()
-system.tlm0.addr_ranges = [AddrRange('512MB')]
-system.tlm0.port_type = "tlm_slave"
-system.tlm0.port_data = "transactor0"
-
-system.tlm1 = ExternalSlave()
-system.tlm1.addr_ranges = [AddrRange('512MB')]
-system.tlm1.port_type = "tlm_slave"
-system.tlm1.port_data = "transactor1"
+system.tlm = ExternalSlave()
+system.tlm.addr_ranges = [AddrRange('512MB')]
+system.tlm.port_type = "tlm_slave"
+system.tlm.port_data = "transactor"
 
 # Route the connections:
 for i in range(np):
-    system.cpu[i].icache_port = system.membus[i].cpu_side_ports
-    system.cpu[i].dcache_port = system.membus[i].cpu_side_ports
+    system.cpu[i].icache_port = system.membus.cpu_side_ports
+    system.cpu[i].dcache_port = system.membus.cpu_side_ports
     system.cpu[i].createInterruptController()
-
-system.membus[0].mem_side_ports = system.tlm0.port
-system.membus[1].mem_side_ports = system.tlm1.port
-
-# system.system_port = system.membus.cpu_side_ports
+system.system_port = system.membus.cpu_side_ports
+system.membus.mem_side_ports = system.tlm.port
 
 for i in range(np):
     # Create a process for a simple "Hello World" application
@@ -125,7 +102,7 @@ for i in range(np):
     # Set the command
     # cmd is a list which begins with the executable (like argv)
     if (np > 1):
-        process.cmd = [binary]
+        process.cmd = [multibinary[i]]
     else:
         process.cmd = [binary]
     multiprocesses.append(process)
