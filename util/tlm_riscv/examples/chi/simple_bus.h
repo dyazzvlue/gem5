@@ -64,17 +64,6 @@ struct SimpleBus : sc_core::sc_module
 
         unsigned transport_dbg(tlm::tlm_generic_payload &trans) {
                 // receive Functional request from gem5 world, forward to memory directly
-                /*
-                auto addr = trans.get_address();
-                auto id = decode(addr);
-
-                if (id < 0) {
-                        trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
-                        return 0;
-                }
-
-                trans.set_address(ports[id]->global_to_local(addr));
-                */
                 auto addr = trans.get_address();
                 auto id = decode(addr);
                 if (id < 0) {

@@ -27,9 +27,13 @@
 class TxnRouter : public sc_core::sc_module
 {
 public:
-    TxnRouter(sc_core::sc_module_name, uint64_t mem_start_addr_, uint64_t mem_size_)
+    TxnRouter(sc_core::sc_module_name,
+              uint64_t mem_start_addr_,
+              uint64_t mem_size_,
+              bool debug_)
         : mem_start_addr(mem_start_addr_),
         mem_size(mem_size_),
+        debug(debug_),
         m_peq(this, &TxnRouter::peq_cb),
         transaction_in_progress(0),
         response_in_progress(false),
@@ -42,9 +46,6 @@ public:
         isock_mem.register_nb_transport_bw(this, &TxnRouter::nb_transport_bw_resp);
 
         SC_THREAD(execute_transaction_process);
-        //SC_METHOD(execute_transaction_process);
-        //sensitive << target_done_event;
-        //dont_initialize();
 
     }
     SC_HAS_PROCESS(TxnRouter);
@@ -53,13 +54,22 @@ private:
     void b_transport(tlm::tlm_generic_payload &trans, sc_core::sc_time &delay)
     {
         // receive Atomic request from gem5 world
-       // std::cout << "[txn_router] b_transport " << std::endl;
+        if (debug) {
+            SC_REPORT_INFO( "txn_router", "b_transport ");
+        }
+
         if (ToMem(trans)) {
-         //   std::cout << sc_time_stamp() << " receive to mem request " << std::endl;
-            execute_transaction(trans);
+            if (debug){
+                SC_REPORT_INFO("txn_router", "receive mem request");
+            }
+            isock_mem->b_transport(trans, delay);
+            trans.set_response_status(tlm::TLM_OK_RESPONSE);
+            //execute_transaction(trans);
         }
         else {
-           // std::cout << sc_time_stamp() << " receive to mem request " << std::endl;
+            if (debug) {
+               SC_REPORT_INFO("txn_router", "receive to mem request ");
+            }
             isock_bus->b_transport(trans, delay);
         }
     }
@@ -69,9 +79,13 @@ private:
         // recvFunctional request from gem5 world
         // used for loading the binary (recvFunctional)
         // send to the memory directly
-        //std::cout << "[txn_router] transport_dbg " << std::endl;
+        if (debug){
+            SC_REPORT_INFO("txn_router", "transport_dbg");
+        }
         if (ToMem(trans)) {
-          //  std::cout << sc_time_stamp() << "[txn_router] receive Functional request " << std::endl;
+            if (debug) {
+                SC_REPORT_INFO("txn_router", "receive Functional request ");
+            }
             // Using SimpleBus to access memory
             return isock_bus->transport_dbg(trans);
         }
@@ -86,11 +100,14 @@ private:
                 sc_time& delay)
     {
         // receive TimingReq from gem5 world
-        //std::cout << "[txn_router] nb_transport_fw " << std::endl;
+        if (debug) {
+            SC_REPORT_INFO("txn_router", "nb_transport_fw ");
+        }
         if (ToMem(trans)) {
-          //  std::cout << sc_time_stamp() << " receive to mem request " << std::endl;
+            if (debug) {
+                SC_REPORT_INFO("txn_router", " receive to mem request ");
+            }
             m_peq.notify(trans, phase, delay);
-            // should not forward directly
         }
         else {
             SC_REPORT_FATAL("TXN_ROUTER", "Address out of range. Please check");
@@ -102,7 +119,9 @@ private:
                 tlm::tlm_phase& phase,
                 sc_time& delay)
     {
-        //std::cout << "[txn_router] nb_transport_bw_resp " << std::endl;
+        if (debug){
+             SC_REPORT_INFO("txn_router", "nb_transport_bw_resp ");
+        }
         return tlm::TLM_ACCEPTED;
     }
 
@@ -128,8 +147,10 @@ private:
         response_in_progress = true;
         bw_phase = tlm::BEGIN_RESP;
         delay = sc_time(10.0, SC_NS);
-        //std::cout << sc_time_stamp() << " [TXN_ROUTER] send response addr: "
-         //   << trans.get_address() << std::endl;
+        if (debug){
+           std::cout << sc_time_stamp() << " [txn_router] send response addr: "
+             << trans.get_address() << std::endl;
+        }
         status = tsock->nb_transport_bw( trans, bw_phase, delay );
 
         if (status == tlm::TLM_UPDATED) {
@@ -148,9 +169,11 @@ private:
                 const tlm::tlm_phase& phase)
     {
         sc_time delay;
-        //std::cout << sc_time_stamp() << " peb_cb "  << std::endl;
+
         if (phase == tlm::BEGIN_REQ) {
-           // std::cout << sc_time_stamp() << " [TXN_ROUTER] Begin request" << std::endl;
+            if (debug) {
+                SC_REPORT_INFO("txn_router", " Begin request");
+            }
             trans.acquire();
             if (!transaction_in_progress) {
                 send_end_req(trans);
@@ -162,7 +185,9 @@ private:
         }else if (phase == tlm::END_RESP) {
             /* On receiving END_RESP, the target can release the transaction and
             * allow other pending transactions to proceed */
-          //  std::cout << sc_time_stamp() <<   " [TXN_ROUTER] end response" << std::endl;
+            if (debug) {
+                SC_REPORT_INFO("txn_router", "end response");
+            }
             if (!response_in_progress){
                 SC_REPORT_FATAL("TXN_ROUTER", "Illegal transaction phase END RESP");
             }
@@ -179,8 +204,12 @@ private:
 
             /* ... and to unblock the initiator by issuing END_REQ */
             if (end_req_pending) {
-            //    std::cout << sc_time_stamp() << " [TXN_ROUTER] end_req_pending "
-            //        " addr: " << end_req_pending->get_address() << std::endl;
+                if (debug){
+                    std::cout << sc_time_stamp()
+                        << " [TXN_ROUTER] end_req_pending addr: "
+                        << end_req_pending->get_address()
+                        << std::endl;
+                }
                 send_end_req( *end_req_pending );
                 end_req_pending = 0;
             }
@@ -192,7 +221,9 @@ private:
 
     void send_end_req(tlm::tlm_generic_payload& trans)
     {
-        //std::cout << sc_time_stamp() <<   " [TXN_ROUTER] send_end_req" << std::endl;
+        if (debug) {
+            SC_REPORT_INFO("txn_router", "send_end_req");
+        }
         tlm::tlm_phase bw_phase;
         sc_time delay;
 
@@ -201,9 +232,11 @@ private:
 
         tlm::tlm_sync_enum status;
         status = tsock->nb_transport_bw(trans, bw_phase, delay);
-        //std::cout <<  sc_time_stamp() <<
-        //    " [TXN_ROUTER] send_end_req nb_transport_bw " <<
-        //    " addr: " << trans.get_address() << std::endl;
+        if (debug) {
+            std::cout <<  sc_time_stamp() <<
+            " [TXN_ROUTER] send_end_req nb_transport_bw " <<
+            " addr: " << trans.get_address() << std::endl;
+        }
         delay = delay + sc_time(15.0, SC_NS); // latency
         target_done_event.notify(delay);
 
@@ -215,8 +248,9 @@ private:
     void execute_transaction_process(){
         while (true){
             wait(target_done_event);
-          //  std::cout << sc_time_stamp() <<
-          //      " [TXN_ROUTER] execute transaction process " << std::endl;
+            if (debug) {
+                SC_REPORT_INFO("txn_router", "execute transaction process");
+            }
             // Execute the read or write commands
             // In this case , forward to next IP by isock_mem;
             execute_transaction(*transaction_in_progress); // TODO
@@ -243,8 +277,9 @@ private:
     void execute_transaction(tlm::tlm_generic_payload& trans)
     {
         // Forward the transaction to next component
-        //std::cout << sc_time_stamp() << " [TXN_ROUTER] execute transaction "
-        //    << std::endl;
+        if (debug) {
+            SC_REPORT_INFO("txn_router", " execute transaction");
+        }
         sc_time delay;
         delay = sc_time(10.0, SC_NS);
         isock_mem->b_transport(trans, delay);
@@ -258,7 +293,6 @@ public:
     tlm_utils::simple_initiator_socket<TxnRouter> isock_mem;
     tlm_utils::simple_initiator_socket<TxnRouter> isock_bus;
 
-
     tlm_utils::peq_with_cb_and_phase<TxnRouter> m_peq;
     tlm::tlm_generic_payload*  transaction_in_progress;
     sc_event                   target_done_event;
@@ -269,6 +303,7 @@ public:
 private:
     uint64_t mem_start_addr;
     uint64_t mem_size;
+    bool debug;
 
 };
 

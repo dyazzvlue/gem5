@@ -150,8 +150,10 @@ sc_main(int argc, char **argv)
     SimpleBus<2,1> bus("SimpleBus");
     bus.ports[0] = new PortMapping(mem_start_addr, mem_end_addr);
 
-    TxnRouter txn_router0("txn_router0", mem_start_addr, memorySize);
-    TxnRouter txn_router1("txn_router1", mem_start_addr, memorySize);
+    TxnRouter txn_router0("txn_router0", mem_start_addr,
+                         memorySize, parser.getVerboseFlag());
+    TxnRouter txn_router1("txn_router1", mem_start_addr,
+                         memorySize, parser.getVerboseFlag());
     // Using CHI cache model
     cache_chi<NODE_ID_RNF0, CACHE_SIZE> rnf0("rnf0");
     cache_chi<NODE_ID_RNF1, CACHE_SIZE> rnf1("rnf1");
@@ -177,20 +179,9 @@ sc_main(int argc, char **argv)
     connect_rn(rnf0, icn.port_RN_F[0]);
     connect_rn(rnf1, icn.port_RN_F[1]);
 
-        //connect_rn(rnf1, icn.port_RN_F[1]);
     connect_sn(sn, icn.port_SN);
 
     sn.init_socket(mem.tsock_sn);
-
-
-    /*
-    Target memory("memory",
-                  parser.getVerboseFlag(),
-                  memorySize,
-                  parser.getMemoryOffset());
-
-    memory.socket.bind(transactor.socket);
-    */
 
     transactor0.sim_control.bind(sim_control);
     transactor1.sim_control.bind(sim_control);
