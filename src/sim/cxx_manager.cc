@@ -553,6 +553,17 @@ CxxConfigManager::bindObjectPorts(SimObject *object)
             }
 
             bindRequestPort(object, *port, peers);
+        }else{
+            /*
+             * Special case for RiscvRTC int_pin port.
+             * In FS mode of gem5-tlm co-simulaiton, int_pin will not be
+             * binded correctly, which will caused segment fault.
+             * This method is only used to bind RTC port.
+             * TODO: change to a more general way
+             */
+            if (object_type == "RiscvRTC"){
+                bindRequestPort(object, *port, peers);
+            }
         }
     }
 }
