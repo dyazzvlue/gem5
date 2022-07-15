@@ -52,6 +52,7 @@
 int
 sc_main(int argc, char **argv)
 {
+    int CORE_NUM=2;
     CliParser parser;
     parser.parse(argc, argv);
 
@@ -62,15 +63,21 @@ sc_main(int argc, char **argv)
                                            parser.getSimulationEnd(),
                                            parser.getDebugFlags());
 
-    unsigned long long int memorySize = 512*1024*1024ULL;
+    //unsigned long long int memorySize = 512*1024*1024ULL;
+    unsigned long long int memorySize = 2048*1024*1024ULL;
 
-    Gem5SystemC::Gem5SlaveTransactor transactor("transactor", "transactor");
+    Gem5SystemC::Gem5SlaveTransactor_Multi transactor("transactor", "transactor",CORE_NUM);
     Target memory("memory",
                   parser.getVerboseFlag(),
                   memorySize,
-                  parser.getMemoryOffset());
+                  parser.getMemoryOffset(),
+                  CORE_NUM
+                  );
 
-    memory.socket.bind(transactor.socket);
+    //memory.socket.bind(transactor.sockets[0]);
+    for (int i=0;i<CORE_NUM;i++){
+        memory.sockets[i].bind(transactor.sockets[i]);
+    }
     transactor.sim_control.bind(sim_control);
 
     SC_REPORT_INFO("sc_main", "Start of Simulation");

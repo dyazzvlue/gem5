@@ -48,6 +48,8 @@ namespace Gem5SystemC
 // forward declaration
 class Gem5SlaveTransactor;
 
+class Gem5SlaveTransactor_Multi;
+
 /**
  * Test that gem5 is at the same time as SystemC
  */
@@ -91,6 +93,9 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
      */
     tlm::tlm_generic_payload *blockingResponse;
 
+    int core_num;
+
+
   protected:
     /** The gem5 Port slave interface */
     gem5::Tick recvAtomic(gem5::PacketPtr packet);
@@ -101,6 +106,14 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
     void recvFunctionalSnoop(gem5::PacketPtr packet);
 
     Gem5SlaveTransactor* transactor;
+    Gem5SlaveTransactor_Multi* transactor_multi;
+
+    unsigned int getCoreID(gem5::RequestorID id);
+
+     /*
+     * Keep track of the request port of cores
+     */
+    std::map<const std::string, std::list<gem5::RequestorID>> cpuPorts;
 
   public:
     /** The TLM initiator interface */
@@ -113,6 +126,9 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
                 gem5::ExternalSlave &owner_);
 
     void bindToTransactor(Gem5SlaveTransactor* transactor);
+    void bindToTransactor(Gem5SlaveTransactor_Multi* transactor);
+
+    void updateCorePortMap(std::map<const std::string, std::list<gem5::RequestorID>> map);
 
     friend PayloadEvent<SCSlavePort>;
 };

@@ -58,8 +58,13 @@ class Gem5Extension: public tlm::tlm_extension<Gem5Extension>
         getExtension(const tlm::tlm_generic_payload &payload);
     gem5::PacketPtr getPacket();
 
+    // [PZY]
+    void setCoreID(unsigned int id) {this->coreId= id;}
+    unsigned int getCoreID() {return this->coreId;}
+
   private:
     gem5::PacketPtr Packet;
+    unsigned int coreId; // equals to target port in sc_slave_port
 };
 
 }

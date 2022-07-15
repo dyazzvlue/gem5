@@ -30,16 +30,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "sc_ext.hh"
 #include "sc_target.hh"
 
 using namespace sc_core;
 using namespace std;
 
+typedef tlm_utils::simple_target_socket<Target> target_port_type;
+
 Target::Target(sc_core::sc_module_name name,
     bool debug,
     unsigned long long int size,
-    unsigned int offset) :
-    socket("socket"),
+    unsigned int offset,
+    int socket_num
+    ) :
+    //socket("socket"),
+    sockets("sockets"),
     transaction_in_progress(0),
     response_in_progress(false),
     next_response_pending(0),
@@ -47,17 +53,22 @@ Target::Target(sc_core::sc_module_name name,
     m_peq(this, &Target::peq_cb),
     debug(debug),
     size(size),
-    offset(offset)
+    offset(offset),
+    socket_num(socket_num)
 {
     /* Register tlm transport functions */
+    /*
     socket.register_b_transport(this, &Target::b_transport);
     socket.register_transport_dbg(this, &Target::transport_dbg);
     socket.register_nb_transport_fw(this, &Target::nb_transport_fw);
-
+    */
+    std::cout << "[Target] socket num " << this->socket_num << std::endl;
+    sockets.init(socket_num,
+                sc_bind(&Target::create_socket, this));
 
     /* allocate storage memory */
     mem = new unsigned char[size];
-
+    //std::cout << "[Target] size " << size << " offset: " << offset << std::endl;
     SC_METHOD(execute_transaction_process);
     sensitive << target_done_event;
     dont_initialize();
@@ -81,6 +92,7 @@ Target::b_transport(tlm::tlm_generic_payload& trans, sc_time& delay)
 unsigned int
 Target::transport_dbg(tlm::tlm_generic_payload& trans)
 {
+    //std::cout << sc_time_stamp() <<   " [Target] transport_dbg addr: " << trans.get_address() << std::endl;
     check_address(trans.get_address());
 
     tlm::tlm_command cmd = trans.get_command();
@@ -95,11 +107,15 @@ Target::transport_dbg(tlm::tlm_generic_payload& trans)
         if (debug) {
             SC_REPORT_INFO("target", "tlm::TLM_READ_COMMAND");
         }
+        //std::cout << sc_time_stamp() << " [Target] TLM_READ_COMMAND " <<
+        //     " addr: " << adr << " len: " << len << std::endl;
         std::memcpy(ptr, mem_array_ptr, len);
     } else if ( cmd == tlm::TLM_WRITE_COMMAND ) {
         if (debug) {
             SC_REPORT_INFO("target", "tlm::TLM_WRITE_COMMAND");
         }
+        //std::cout << sc_time_stamp() << " [Target]:TLM_WRITE_COMMAND " <<
+        //    " addr: " << adr << " len: " << len << std::endl;
         std::memcpy(mem_array_ptr, ptr, len);
     }
 
@@ -113,6 +129,7 @@ tlm::tlm_sync_enum Target::nb_transport_fw(tlm::tlm_generic_payload& trans,
                                            sc_time& delay)
 {
     /* Queue the transaction until the annotated time has elapsed */
+    //std::cout << sc_time_stamp() <<   " [Target] nb_transport_fw" << std::endl;
     m_peq.notify(trans, phase, delay);
     return tlm::TLM_ACCEPTED;
 }
@@ -122,23 +139,24 @@ Target::peq_cb(tlm::tlm_generic_payload& trans,
                const tlm::tlm_phase& phase)
 {
     sc_time delay;
-
+    //std::cout << sc_time_stamp() <<   " [Target] peb_cb" << std::endl;
     if (phase == tlm::BEGIN_REQ) {
         if (debug) SC_REPORT_INFO("target", "tlm::BEGIN_REQ");
-
+        //std::cout << sc_time_stamp() <<   " [Target] begin request" << std::endl;
         /* Increment the transaction reference count */
         trans.acquire();
 
         if ( !transaction_in_progress ) {
             send_end_req(trans);
         } else {
-            /* Put back-pressure on initiator by deferring END_REQ until
-             * pipeline is clear */
+           /* On receiving END_RESP, the target can release the transaction and
+         * allow other pending transactions to proceed */
             end_req_pending = &trans;
         }
     } else if (phase == tlm::END_RESP) {
         /* On receiving END_RESP, the target can release the transaction and
          * allow other pending transactions to proceed */
+        //std::cout << sc_time_stamp() <<   " [Target] end response" << std::endl;
         if (!response_in_progress) {
             SC_REPORT_FATAL("TLM-2", "Illegal transaction phase END_RESP"
                             "received by target");
@@ -168,20 +186,25 @@ Target::peq_cb(tlm::tlm_generic_payload& trans,
 void
 Target::send_end_req(tlm::tlm_generic_payload& trans)
 {
+    //std::cout << sc_time_stamp() <<   " [Target] send_end_req" << std::endl;
     tlm::tlm_phase bw_phase;
     sc_time delay;
 
     /* Queue the acceptance and the response with the appropriate latency */
     bw_phase = tlm::END_REQ;
     delay = sc_time(10.0, SC_NS); // Accept delay
+    //delay = sc_time(0.5, SC_NS); // Accept delay
 
     tlm::tlm_sync_enum status;
-    status = socket->nb_transport_bw(trans, bw_phase, delay);
-
+    unsigned int core_id = Gem5SystemC::Gem5Extension::getExtension(trans).getCoreID();
+    status = sockets[core_id]->nb_transport_bw(trans, bw_phase, delay);
+    //status = socket->nb_transport_bw(trans, bw_phase, delay);
+    //std::cout << sc_time_stamp() <<
+    //    " [Target] send_end_req nb_transport_bw" << std::endl;
     /* Ignore return value;
      * initiator cannot terminate transaction at this point
      * Queue internal event to mark beginning of response: */
-    delay = delay + sc_time(40.0, SC_NS); // Latency
+    delay = delay + sc_time(40, SC_NS); // Latency
     target_done_event.notify(delay);
 
     assert(transaction_in_progress == 0);
@@ -191,6 +214,8 @@ Target::send_end_req(tlm::tlm_generic_payload& trans)
 void
 Target::execute_transaction_process()
 {
+    //std::cout << sc_time_stamp() <<
+    //    " [Target] execute_transaction_process" << std::endl;
     /* Execute the read or write commands */
     execute_transaction( *transaction_in_progress );
 
@@ -220,6 +245,9 @@ Target::execute_transaction(tlm::tlm_generic_payload& trans)
     unsigned char*   byt = trans.get_byte_enable_ptr();
     unsigned int     wid = trans.get_streaming_width();
 
+//    std::cout << sc_time_stamp() <<
+  //       " [Target] execute_transaction , addr : " <<
+    //     trans.get_address() << std::endl;
     if ( byt != 0 ) {
         cout << "Byte Error" << endl;
         trans.set_response_status( tlm::TLM_BYTE_ENABLE_ERROR_RESPONSE );
@@ -239,11 +267,15 @@ Target::execute_transaction(tlm::tlm_generic_payload& trans)
         if (debug) {
             SC_REPORT_INFO("target", "tlm::TLM_READ_COMMAND");
         }
+        //std::cout << sc_time_stamp() << " [Target] EXEC TLM_READ_COMMAND " <<
+        //     " addr: " << adr << " len: " << len << std::endl;
         std::memcpy(ptr, mem_array_ptr, len);
     } else if ( cmd == tlm::TLM_WRITE_COMMAND ) {
         if (debug) {
             SC_REPORT_INFO("target", "tlm::TLM_WRITE_COMMAND");
         }
+        //std::cout << sc_time_stamp() << " [Target] EXEC TLM_WRITE_COMMAND " <<
+        //     " addr: " << adr << " len: " << len << std::endl;
         std::memcpy(mem_array_ptr, ptr, len);
     }
 
@@ -253,6 +285,8 @@ Target::execute_transaction(tlm::tlm_generic_payload& trans)
 void
 Target::send_response(tlm::tlm_generic_payload& trans)
 {
+    //std::cout << sc_time_stamp() << " [Target] send response " <<
+             //std::endl;
     tlm::tlm_sync_enum status;
     tlm::tlm_phase bw_phase;
     sc_time delay;
@@ -260,7 +294,9 @@ Target::send_response(tlm::tlm_generic_payload& trans)
     response_in_progress = true;
     bw_phase = tlm::BEGIN_RESP;
     delay = sc_time(10.0, SC_NS);
-    status = socket->nb_transport_bw( trans, bw_phase, delay );
+    unsigned int core_id = Gem5SystemC::Gem5Extension::getExtension(trans).getCoreID();
+    status = sockets[core_id]->nb_transport_bw(trans, bw_phase, delay);
+    //status = socket->nb_transport_bw( trans, bw_phase, delay );
 
     if (status == tlm::TLM_UPDATED) {
         /* The timing annotation must be honored */
@@ -271,4 +307,23 @@ Target::send_response(tlm::tlm_generic_payload& trans)
         response_in_progress = false;
     }
     trans.release();
+}
+
+target_port_type* Target::create_socket(){
+    std::string name = getNameForNewSocket("Target");
+    std::cout << "Target create socket: " << name << std::endl;
+    target_port_type* socket_p = new target_port_type(name.c_str());
+    socket_p->register_b_transport(this, &Target::b_transport);
+    socket_p->register_transport_dbg(this, &Target::transport_dbg);
+    socket_p->register_nb_transport_fw(this, &Target::nb_transport_fw);
+    return socket_p;
+}
+
+std::string Target::getNameForNewSocket(std::string name)
+{
+    assert(count < socket_num);
+    std::string rename;
+    rename += name;
+    rename += std::to_string(count);
+    return rename;
 }

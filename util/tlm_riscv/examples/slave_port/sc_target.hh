@@ -42,11 +42,13 @@
 
 using namespace sc_core;
 using namespace std;
-
 struct Target: sc_module
 {
+    typedef tlm_utils::simple_target_socket<Target> target_port_type;
+
     /** TLM interface socket: */
-    tlm_utils::simple_target_socket<Target> socket;
+    //tlm_utils::simple_target_socket<Target> socket;
+    sc_core::sc_vector<target_port_type> sockets;
 
     /** TLM related member variables: */
     tlm::tlm_generic_payload*  transaction_in_progress;
@@ -60,10 +62,15 @@ struct Target: sc_module
     /** Storage, may be implemented with a map for large devices */
     unsigned char *mem;
 
+    int socket_num;
+    int count = 0;
+
     Target(sc_core::sc_module_name name,
         bool debug,
         unsigned long long int size,
-        unsigned int offset);
+        unsigned int offset,
+        int socket_num
+        );
     SC_HAS_PROCESS(Target);
 
     /** TLM interface functions */
@@ -95,6 +102,10 @@ struct Target: sc_module
     /** Helping Variables **/
     unsigned long long int size;
     unsigned offset;
+
+    target_port_type* create_socket();
+    std::string getNameForNewSocket(std::string name);
+    unsigned int getSocketNum() {return socket_num;}
 };
 
 #endif //__SIM_SC_TARGET_HH__

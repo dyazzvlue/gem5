@@ -35,6 +35,7 @@
 
 #include <tlm_utils/simple_initiator_socket.h>
 
+#include <map>
 #include <systemc>
 #include <tlm>
 
@@ -44,15 +45,20 @@
 namespace Gem5SystemC
 {
 
+typedef tlm_utils::simple_initiator_socket<SCSlavePort> init_port_type;
+
 class Gem5SlaveTransactor : public sc_core::sc_module
 {
   public:
     // module interface
+
+    // basic method
     tlm_utils::simple_initiator_socket<SCSlavePort> socket;
     sc_core::sc_port<Gem5SimControlInterface> sim_control;
 
   private:
     std::string portName;
+    int socket_num;
 
   public:
     SC_HAS_PROCESS(Gem5SlaveTransactor);
@@ -61,6 +67,39 @@ class Gem5SlaveTransactor : public sc_core::sc_module
                         const std::string& portName);
 
     void before_end_of_elaboration();
+};
+
+class Gem5SlaveTransactor_Multi : public sc_core::sc_module
+{
+  public:
+    // module interface
+
+    /**
+     * @brief vector of SCSlavaPort sockets
+     *
+     */
+    sc_core::sc_vector<init_port_type> sockets;
+    // basic method
+    sc_core::sc_port<Gem5SimControlInterface> sim_control;
+
+  private:
+    std::string portName;
+    unsigned int socket_num; // as same sa core num
+    unsigned int count = 0 ; // used for generate socket name
+    std::string getNameForNewSocket(std::string name);
+
+  public:
+    SC_HAS_PROCESS(Gem5SlaveTransactor);
+
+    Gem5SlaveTransactor_Multi(sc_core::sc_module_name name,
+                        const std::string& portName,
+                        unsigned int socket_num);
+
+    void before_end_of_elaboration();
+    init_port_type* create_socket();
+    unsigned int getSocketNum() {return socket_num;}
+
+
 };
 
 }

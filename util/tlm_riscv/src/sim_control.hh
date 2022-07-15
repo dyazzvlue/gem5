@@ -71,6 +71,11 @@ class Gem5SimControl : public Module, public Gem5SimControlInterface
     std::map<const std::string, SCSlavePort*> slavePorts;
     std::map<const std::string, SCMasterPort*> masterPorts;
 
+    /*
+     * Keep track of the request port of cores
+     */
+   std::map<const std::string, std::list<gem5::RequestorID>> cpuPorts;
+
     /// Pointer to a previously created instance.
     static Gem5SimControl* instance;
 
@@ -117,6 +122,15 @@ class Gem5SimControl : public Module, public Gem5SimControlInterface
     SCMasterPort* getMasterPort(const std::string& name) override;
 
     void end_of_elaboration();
+
+    /**
+     * @brief Update core infomation for co-simulation
+     *
+     * @param id
+     */
+    void addCoreID(const std::string core_name, gem5::RequestorID id);
+    void initCoreInfo(gem5::CxxConfigManager* cxx_manager);
+    unsigned int getCoreIDByRequestorID(gem5::RequestorID id);
 
     void run();
 };

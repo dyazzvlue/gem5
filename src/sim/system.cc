@@ -567,6 +567,19 @@ System::_getRequestorId(const SimObject* requestor,
     return requestors.back().id;
 }
 
+// TODO check if has multiple system
+RequestorID getRequestorId(const SimObject* requestor,
+                         std::string subrequestor={})
+{
+    std::vector<System *>::iterator i = System::systemList.begin();
+    std::vector<System *>::iterator end = System::systemList.end();
+    for (; i != end; ++i) {
+        System *sys = *i;
+        return sys->getRequestorId(requestor, subrequestor);
+    }
+    return -1;
+}
+
 std::string
 System::leafRequestorName(const SimObject* requestor,
                        const std::string& subrequestor)

@@ -70,8 +70,8 @@ struct SimpleBus : sc_core::sc_module
                         trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
                         return 0;
                 }
-                std::cout << sc_time_stamp() << " [SimpleBus] forward "<< addr
-                        <<  " to memory " << std::endl;
+                //std::cout << sc_time_stamp() << " [SimpleBus] forward "<< addr
+                //        <<  " to memory " << std::endl;
                 return isocks[id]->transport_dbg(trans);
         }
 };

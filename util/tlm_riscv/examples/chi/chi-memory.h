@@ -21,9 +21,15 @@ struct SimpleMemory : public sc_core::sc_module, public load_if
         uint32_t size;
         bool read_only;
         sc_core::sc_mutex access_mux;
+        uint64_t mem_start_addr;
+        uint64_t mem_end_addr;
 
-        SimpleMemory(sc_core::sc_module_name, uint32_t size, bool read_only = false)
-            : data(new uint8_t[size]()), size(size), read_only(read_only) {
+        SimpleMemory(sc_core::sc_module_name, uint32_t size,
+                uint64_t mem_start_addr, uint64_t mem_end_addr,
+                bool read_only = false)
+            : data(new uint8_t[size]()), size(size), mem_start_addr(mem_start_addr),
+                mem_end_addr(mem_end_addr), read_only(read_only) {
+                assert(mem_end_addr == mem_start_addr + size -1 );
                 tsock.register_b_transport(this, &SimpleMemory::transport_bus);
                 tsock.register_get_direct_mem_ptr(this, &SimpleMemory::get_direct_mem_ptr);
                 tsock.register_transport_dbg(this, &SimpleMemory::transport_dbg);
@@ -120,7 +126,8 @@ struct SimpleMemory : public sc_core::sc_module, public load_if
                         }
                 } else {
                 */
-                        if ((addr + len) > sc_dt::uint64(size)) {
+                        //if ((addr + len) > (sc_dt::uint64(size)) {
+                        if ((addr + len) > (mem_end_addr)) {
                                 trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
                                 SC_REPORT_FATAL("Memory", "Unsupported access\n");
                                 return 0;
@@ -129,12 +136,14 @@ struct SimpleMemory : public sc_core::sc_module, public load_if
                         if (trans.get_command() == tlm::TLM_READ_COMMAND) {
                                 //std::cout << "[CHI-MEMROY] read data from addr: "
                                 //	<< addr << std::endl;
-                                read_data(addr, ptr, len);
+                                //read_data(addr, ptr, len);
+                                read_data(addr - mem_start_addr, ptr, len);
                         }
                         else if (cmd == tlm::TLM_WRITE_COMMAND) {
                                 //std::cout << "[CHI-MEMROY] write data to addr: "
                                 //	<< addr << std::endl;
-                                write_data(addr, ptr, len);
+                                //write_data(addr, ptr, len);
+                                write_data(addr - mem_start_addr, ptr, len);
                         }
                         else{
                                 SC_REPORT_FATAL("Memory", "Unsupported tlm command\n");

@@ -50,6 +50,7 @@ CliParser::usage(const std::string& prog_name)
           "    -v                           -- verbose output\n"
           "    -e <ticks>                   -- end of simulation after a \n"
           "                                    given number of ticks\n"
+          "    -n <num>                     -- number of cpu cores\n"
           "\n");
     std::exit(EXIT_FAILURE);
 }
@@ -101,6 +102,12 @@ CliParser::parse(int argc, char** argv)
                 std::istringstream(argv[arg_ptr]) >> memoryOffset;
                 arg_ptr++;
                 /* code */
+            } else if (option == "-n"){
+                if (num_args < 1) {
+                    usage(prog_name);
+                }
+                std::istringstream(argv[arg_ptr]) >> cpuNum;
+                arg_ptr++;
             } else {
                 usage(prog_name);
             }

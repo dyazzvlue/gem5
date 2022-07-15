@@ -50,6 +50,7 @@ class CliParser
     bool verboseFlag;
     std::vector<std::string> debugFlags;
     std::string configFile;
+    uint64_t cpuNum;
 
     void usage(const std::string& prog_name);
   public:
@@ -62,6 +63,7 @@ class CliParser
     uint64_t getSimulationEnd() { assert(parsed); return simulationEnd; }
     bool getVerboseFlag()       { assert(parsed); return verboseFlag; }
     std::string getConfigFile() { assert(parsed); return configFile; }
+    uint64_t getCpuCores() { assert(parsed); return cpuNum;}
     std::string getDebugFlags();
 };
 

@@ -106,6 +106,7 @@ private:
         if (ToMem(trans)) {
             if (debug) {
                 SC_REPORT_INFO("txn_router", " receive to mem request ");
+                std::cout << "Addr : " << trans.get_address() << std::endl;
             }
             m_peq.notify(trans, phase, delay);
         }
@@ -173,6 +174,7 @@ private:
         if (phase == tlm::BEGIN_REQ) {
             if (debug) {
                 SC_REPORT_INFO("txn_router", " Begin request");
+                std::cout << "Addr : " << trans.get_address() << std::endl;
             }
             trans.acquire();
             if (!transaction_in_progress) {
@@ -187,6 +189,7 @@ private:
             * allow other pending transactions to proceed */
             if (debug) {
                 SC_REPORT_INFO("txn_router", "end response");
+                std::cout << "Addr : " << trans.get_address() << std::endl;
             }
             if (!response_in_progress){
                 SC_REPORT_FATAL("TXN_ROUTER", "Illegal transaction phase END RESP");
@@ -223,6 +226,7 @@ private:
     {
         if (debug) {
             SC_REPORT_INFO("txn_router", "send_end_req");
+            std::cout << "Addr : " << trans.get_address() << std::endl;
         }
         tlm::tlm_phase bw_phase;
         sc_time delay;
@@ -250,6 +254,7 @@ private:
             wait(target_done_event);
             if (debug) {
                 SC_REPORT_INFO("txn_router", "execute transaction process");
+                std::cout << "Addr : " << transaction_in_progress->get_address() << std::endl;
             }
             // Execute the read or write commands
             // In this case , forward to next IP by isock_mem;
@@ -279,6 +284,7 @@ private:
         // Forward the transaction to next component
         if (debug) {
             SC_REPORT_INFO("txn_router", " execute transaction");
+            std::cout << "Addr : " << trans.get_address() << std::endl;
         }
         sc_time delay;
         delay = sc_time(10.0, SC_NS);

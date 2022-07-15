@@ -54,7 +54,47 @@ Gem5SlaveTransactor::before_end_of_elaboration()
 {
     auto* port = sim_control->getSlavePort(portName);
 
+    port->bindToTransactor((Gem5SlaveTransactor*)this);
+}
+
+Gem5SlaveTransactor_Multi::Gem5SlaveTransactor_Multi(sc_core::sc_module_name name,
+                                         const std::string& portName,
+                                         unsigned int socket_num)
+    : sc_core::sc_module(name),
+      sockets(portName.c_str()),
+      sim_control("sim_control"),
+      portName(portName),
+      socket_num(socket_num)
+{
+    if (portName.empty()) {
+        SC_REPORT_ERROR(name, "No port name specified!\n");
+    }
+    sockets.init(socket_num,
+                sc_bind(&Gem5SlaveTransactor_Multi::create_socket, this));
+}
+
+void
+Gem5SlaveTransactor_Multi::before_end_of_elaboration()
+{
+    auto* port = sim_control->getSlavePort(portName);
     port->bindToTransactor(this);
+}
+
+init_port_type* Gem5SlaveTransactor_Multi::create_socket()
+{
+    std::string name = getNameForNewSocket(portName);
+    std::cout << "create socket: " << name << std::endl;
+    init_port_type* socket_p = new init_port_type(name.c_str());
+    return socket_p;
+}
+
+std::string Gem5SlaveTransactor_Multi::getNameForNewSocket(std::string name)
+{
+    assert(count < socket_num);
+    std::string rename;
+    rename += name;
+    rename += std::to_string(count);
+    return rename;
 }
 
 }

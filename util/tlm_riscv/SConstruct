@@ -35,6 +35,7 @@ import sys
 
 
 gem5_arch = 'RISCV'
+#gem5_arch = 'X86'
 gem5_arch_msi = 'RISCV_CHI'
 gem5_variant = 'opt'
 #gem5_variant = 'debug'
@@ -74,7 +75,10 @@ deps = [] # keep track of all dependencies required for building the binaries
 #deps += SConscript('src/SConscript', variant_dir='build/tlm', exports='env')
 deps += SConscript('src/SConscript',
                     #variant_dir='build2.3.3/tlm', exports='env')
-                    variant_dir='build2.3.3/tlm', exports='env')
+                    #variant_dir='build2.3.3/tlm', exports='env')
+                    # new sc_slave transactor
+                    variant_dir='build_new/tlm', exports='env') 
+                    
 
 deps += SConscript('examples/common/SConscript',
                    #variant_dir='build/examples/common',
@@ -117,13 +121,19 @@ ex_master = SConscript('examples/master_port/SConscript',
 
 ex_slave = SConscript('examples/slave_port/SConscript',
                       variant_dir='build/examples/slave_port',
-                      #variant_dir='build2.3.3/examples/slave_port',
-                      #variant_dir='build_chi/examples/slave_port',
+                      exports=['env', 'deps'])
+ex_slave_new = SConscript('examples/slave_port/SConscript',
+                      variant_dir='build_new/examples/slave_port',
                       exports=['env', 'deps'])
 chi_test = SConscript('examples/chi/SConscript',
                       variant_dir='build_chi/examples/chi',
                       exports=['env', 'deps'])
+chi_new = SConscript('examples/chi/SConscript',
+                      variant_dir='build_new/examples/chi',
+                      exports=['env', 'deps'])
 
 #Default(ex_master + ex_slave)
 #Default(ex_slave)
-Default(chi_test)
+Default(ex_slave_new + chi_new)
+
+#Default(chi_test)

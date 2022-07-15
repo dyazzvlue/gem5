@@ -130,6 +130,7 @@ Gem5SimControl::Gem5SimControl(sc_core::sc_module_name name,
 
     try {
         config_manager->instantiate();
+        initCoreInfo(config_manager);
     } catch (gem5::CxxConfigManager::Exception &e) {
         std::cerr << "Config problem in sim object "
                   << e.name << ": " << e.message << "\n";
@@ -192,6 +193,7 @@ void
 Gem5SimControl::registerMasterPort(const std::string& name, SCMasterPort* port)
 {
     if (masterPorts.find(name) == masterPorts.end()) {
+        std::cout << "REGISTER master: " << name << std::endl;
         masterPorts[name] = port;
     } else {
         std::cerr << "Master Port " << name << " is already registered!\n";
@@ -202,11 +204,13 @@ Gem5SimControl::registerMasterPort(const std::string& name, SCMasterPort* port)
 SCSlavePort*
 Gem5SimControl::getSlavePort(const std::string& name)
 {
+    std::cout << "REGISTER slave: " << name << std::endl;
     if (slavePorts.find(name) == slavePorts.end()) {
         std::cerr << "Slave Port " << name << " was not found!\n";
         std::exit(EXIT_FAILURE);
     }
-
+    // Update the core <-> requestor id infomation to slave port
+    slavePorts.at(name)->updateCorePortMap(this->cpuPorts);
     return slavePorts.at(name);
 }
 
@@ -221,4 +225,50 @@ Gem5SimControl::getMasterPort(const std::string& name)
     return masterPorts.at(name);
 }
 
+void Gem5SimControl::initCoreInfo(gem5::CxxConfigManager* cxx_manager) {
+    // init core infomation according to cxx manager
+    std::list<std::string> core_list = cxx_manager->cpuNameList;
+    for (auto it = core_list.begin(); it != core_list.end(); it ++){
+        std::string core_name = *it;
+        std::cerr << "Init Core " << core_name << " information\n";
+        gem5::SimObject* core_obj = cxx_manager->getCpuObjectByName(core_name);
+        gem5::RequestorID inst_id = gem5::getRequestorId(core_obj, "inst");
+        gem5::RequestorID data_id = gem5::getRequestorId(core_obj, "data");
+
+        this->addCoreID(core_name, inst_id);
+        this->addCoreID(core_name, data_id);
+    }
+}
+
+void Gem5SimControl::addCoreID(const std::string core_name, gem5::RequestorID id){
+    for (auto it = cpuPorts.begin();it != cpuPorts.end(); it++){
+        if (it->first == core_name){
+            std::cerr << "Append core: " << core_name << " portID: " << id << "\n" ;
+            it->second.push_back(id);
+            return;
+        }
+
+    }
+    // not found, add new key-value in cpuPorts map
+    std::cerr << "Add core: " << core_name << " portID: " << id << "\n" ;
+    std::list<gem5::RequestorID> id_list;
+    id_list.push_back(id);
+    cpuPorts[core_name] = id_list;
+
+}
+
+ unsigned int Gem5SimControl::getCoreIDByRequestorID(gem5::RequestorID id)
+ {
+    unsigned int core_id = 0;
+    for (auto it = cpuPorts.begin();it != cpuPorts.end(); it++){
+        auto it_find = std::find(it->second.begin(),it->second.end(),id);
+        if (it_find != it->second.end()){
+            return core_id;
+        }else{
+            core_id++;
+        }
+    }
+    // not found, using default system port
+    return 0;
+ }
 }

@@ -155,7 +155,7 @@ CxxConfigManager::findObject(const std::string &object_name,
     try {
         DPRINTF(CxxConfig, "Configuring sim object references for: %s"
             " (%s from object %s)\n", instance_name, object_type,
-            object_name);
+                object_name);
 
         /* Remember the path back to the top of the recursion to detect
          *  cycles */
@@ -277,7 +277,10 @@ CxxConfigManager::findObjectParams(const std::string &object_name)
 
     DPRINTF(CxxConfig, "Configuring parameters of object: %s (%s)\n",
         instance_name, object_type);
-
+    if (object_type == "TimingSimpleCPU"){ // TODO: for test
+        std::cout << "Add " << instance_name << " to cpu list" << std::endl;
+        addToCpuList(instance_name);
+    }
     CxxConfigParams *object_params = entry.makeParamsObject();
 
     try {
@@ -726,6 +729,27 @@ CxxConfigManager::setParamVector(const std::string &object_name,
 void CxxConfigManager::addRenaming(const Renaming &renaming)
 {
     renamings.push_back(renaming);
+}
+
+void CxxConfigManager::addToCpuList(const std::string name){
+    auto it = std::find(cpuNameList.begin(),cpuNameList.end() ,name);
+    if ( it == cpuNameList.end()) {
+        // no in the list , add it
+        cpuNameList.push_back(name);
+    }
+}
+
+SimObject*
+CxxConfigManager::getCpuObjectByName(const std::string name) {
+    auto it = std::find(cpuNameList.begin(),cpuNameList.end() ,name);
+    if ( it == cpuNameList.end()) {
+        throw Exception("", csprintf("CpuObject %s not found", name));
+    }
+    return &getObject<SimObject>(name);
+}
+
+std::list<std::string> CxxConfigManager::getCpuList(){
+    return this->cpuNameList;
 }
 
 } // namespace gem5

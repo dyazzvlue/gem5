@@ -120,6 +120,9 @@ class CxxConfigManager
     /** SimObjects in order.  This is populated by findAllObjects */
     std::list<SimObject *> objectsInOrder;
 
+    /** A list to save Cpu Tyep Objects */
+    std::list<std::string> cpuNameList;
+
   protected:
     /** While configuring, inVisit contains names of SimObjects visited in
      *  this recursive configuration walk */
@@ -310,6 +313,17 @@ class CxxConfigManager
     void setParamVector(const std::string &object_name,
         const std::string &param_name,
         const std::vector<std::string> &param_values);
+
+    /**
+     * @brief Get the Cpu Objects
+     *
+     * @return SimObject*
+     */
+    SimObject* getCpuObjectByName(const std::string name);
+    void addToCpuList(const std::string name);
+    std::list<std::string> getCpuList();
+
+
 };
 
 } // namespace gem5
