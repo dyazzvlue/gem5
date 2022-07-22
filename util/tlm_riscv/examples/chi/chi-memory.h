@@ -70,10 +70,15 @@ struct SimpleMemory : public sc_core::sc_module, public load_if
                 memcpy(dst, data + addr, num_bytes);
         }
 
+        // TODO: the transaction address is in correct
         void transport_bus(tlm::tlm_generic_payload &trans, sc_core::sc_time &delay) {
-                std::cerr << "mem access through bus" << std::endl;
+                std::cerr << sc_time_stamp() << " mem access through bus" << std::endl;
+                std::cerr << " trans addr: " << trans.get_address() 
+                        << " delay: " << delay << std::endl;
+                trans.set_address(trans.get_address() + mem_start_addr);
                 access_mux.lock();
                 transport(trans, delay);
+                std::cerr << "transport bus complete" << std::endl;
                 access_mux.unlock();
         }
 

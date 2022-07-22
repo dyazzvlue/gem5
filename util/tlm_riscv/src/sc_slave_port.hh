@@ -47,8 +47,10 @@ namespace Gem5SystemC
 
 // forward declaration
 class Gem5SlaveTransactor;
-
 class Gem5SlaveTransactor_Multi;
+
+class BlockingPacketHelper;
+
 
 /**
  * Test that gem5 is at the same time as SystemC
@@ -80,7 +82,6 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
      * is blocking the request channel (Exlusion Rule, see IEEE1666)
      */
     tlm::tlm_generic_payload *blockingRequest;
-
     /**
      * Did another gem5 request arrive while currently blocked?
      * This variable is needed when a retry should happen
@@ -93,9 +94,6 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
      */
     tlm::tlm_generic_payload *blockingResponse;
 
-    int core_num;
-
-
   protected:
     /** The gem5 Port slave interface */
     gem5::Tick recvAtomic(gem5::PacketPtr packet);
@@ -107,6 +105,7 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
 
     Gem5SlaveTransactor* transactor;
     Gem5SlaveTransactor_Multi* transactor_multi;
+    BlockingPacketHelper* blocking_packet_helper;
 
     unsigned int getCoreID(gem5::RequestorID id);
 

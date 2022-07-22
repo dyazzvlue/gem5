@@ -52,6 +52,7 @@ tlm_src += [File('sc_mm.cc')]
 tlm_src += [File('sc_slave_port.cc')]
 tlm_src += [File('sim_control.cc')]
 tlm_src += [File('slave_transactor.cc')]
+tlm_src += [File('blocking_packet_helper.cc')]
 
 tlm = env.Library('gem5_tlm', tlm_src + systemc_src)
 

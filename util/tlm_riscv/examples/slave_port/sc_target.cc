@@ -325,5 +325,6 @@ std::string Target::getNameForNewSocket(std::string name)
     std::string rename;
     rename += name;
     rename += std::to_string(count);
+    count++;
     return rename;
 }

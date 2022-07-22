@@ -64,12 +64,12 @@ Gem5SlaveTransactor_Multi::Gem5SlaveTransactor_Multi(sc_core::sc_module_name nam
       sockets(portName.c_str()),
       sim_control("sim_control"),
       portName(portName),
-      socket_num(socket_num)
+      socket_num(socket_num + 1) // TODO, socket0 is used for system port
 {
     if (portName.empty()) {
         SC_REPORT_ERROR(name, "No port name specified!\n");
     }
-    sockets.init(socket_num,
+    sockets.init(this->socket_num,
                 sc_bind(&Gem5SlaveTransactor_Multi::create_socket, this));
 }
 
@@ -94,6 +94,7 @@ std::string Gem5SlaveTransactor_Multi::getNameForNewSocket(std::string name)
     std::string rename;
     rename += name;
     rename += std::to_string(count);
+    count++;
     return rename;
 }
 

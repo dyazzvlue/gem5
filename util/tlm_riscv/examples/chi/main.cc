@@ -76,14 +76,16 @@ System Architecture:
 +------+-----+  +------+-----+      |
        |               |            |
        |               |            |
-+------v-----+  +------v-----+      |gem5 World
-|  MemBus0   |  |  MemBus1   |      |
-+-----+------+  +-----+------+      |
++------v---------------v-----+      |gem5 World
+|           MemBus           |      |
++-----+---------------+------+      |
+              |              |      |
+              |              |      v
++-------------V--------------+      Exteral Port
+|        Transactor          |      ^
++-----+---------------+------+      |
       |               |             |
-      |               |             v
-+-----v------+  +-----v------+      Exteral Port
-|Transactor0 |  |Transactor1 |      ^
-+-----+------+  +-----+------+      |
+    socket0        socket1          |
       |               |             |
 +-----v------+  +-----v------+      |
 |txn_router0 |  |txn_router1 |      | TLM world
@@ -134,7 +136,8 @@ sc_main(int argc, char **argv)
     CliParser parser;
     parser.parse(argc, argv);
 
-    int core_num = parser.getCpuCores();
+    //int core_num = parser.getCpuCores();
+    int core_num = 2;
     std::cout << "Core num " << core_num << std::endl;
     assert (core_num > 0 && core_num <= 2);
 
@@ -147,8 +150,11 @@ sc_main(int argc, char **argv)
 
     //unsigned long long int memorySize = 512*1024*1024ULL;
     unsigned long long int memorySize = 2048*1024*1024ULL;
-    //unsigned long long int mem_start_addr = 0x00000000;
-    unsigned long long int mem_start_addr = 0x80000000;
+    unsigned long long int mem_start_addr = 0x00000000;
+    if (parser.getMemoryOffset() != 0){
+      mem_start_addr = parser.getMemoryOffset();
+    }
+    //unsigned long long int mem_start_addr = 0x80000000;
     unsigned long long int mem_end_addr = mem_start_addr + memorySize - 1;
 
 
@@ -162,7 +168,7 @@ sc_main(int argc, char **argv)
         Setting external systemc world
 
     */
-    SimpleBus<2,1> bus("SimpleBus");
+    SimpleBus<4,1> bus("SimpleBus");
 
     bus.ports[0] = new PortMapping(mem_start_addr, mem_end_addr);
 
@@ -170,6 +176,10 @@ sc_main(int argc, char **argv)
                          memorySize, parser.getVerboseFlag());
     TxnRouter txn_router1("txn_router1", mem_start_addr,
                          memorySize, parser.getVerboseFlag());
+
+    TxnRouter system_port("system_port", mem_start_addr,
+                         memorySize, parser.getVerboseFlag());
+
     //BusWrapper bus_wrapper("bus_wrapper", mem_start_addr,
     //                     memorySize, parser.getVerboseFlag());
 
@@ -187,8 +197,10 @@ sc_main(int argc, char **argv)
     // connenct gem5 world to txn_router
     bus.isocks[0].bind(mem.tsock);
 
-    transactor.sockets[0].bind(txn_router0.tsock);
-    transactor.sockets[1].bind(txn_router1.tsock);
+    transactor.sockets[0].bind(system_port.tsock);
+    transactor.sockets[1].bind(txn_router0.tsock);
+    transactor.sockets[2].bind(txn_router1.tsock);
+
     //transactor1.socket.bind(txn_router1.tsock);
     //external_tlm_memory.socket.bind(bus_wrapper.tsock);
 
@@ -197,7 +209,9 @@ sc_main(int argc, char **argv)
 
     txn_router0.isock_bus(bus.tsocks[0]);
     txn_router1.isock_bus(bus.tsocks[1]);
-    //bus_wrapper.isock_bus(bus.tsocks[2]);
+    system_port.isock_bus(bus.tsocks[2]);
+    system_port.isock_mem(bus.tsocks[3]);
+
     connect_rn(rnf0, icn.port_RN_F[0]);
     connect_rn(rnf1, icn.port_RN_F[1]);
 

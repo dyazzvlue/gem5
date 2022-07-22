@@ -277,7 +277,9 @@ CxxConfigManager::findObjectParams(const std::string &object_name)
 
     DPRINTF(CxxConfig, "Configuring parameters of object: %s (%s)\n",
         instance_name, object_type);
-    if (object_type == "TimingSimpleCPU"){ // TODO: for test
+    if (object_type == "TimingSimpleCPU"
+        || object_type == "AtomicSimpleCPU"
+        || object_type == "O3CPU "){ // TODO: change to a more general way
         std::cout << "Add " << instance_name << " to cpu list" << std::endl;
         addToCpuList(instance_name);
     }
