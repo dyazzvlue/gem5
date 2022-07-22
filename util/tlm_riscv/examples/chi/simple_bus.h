@@ -36,8 +36,7 @@ struct SimpleBus : sc_core::sc_module
         SimpleBus(sc_core::sc_module_name) {
                 for (auto &s : tsocks) {
                         s.register_b_transport(this, &SimpleBus::transport);
-                        s.register_transport_dbg(this, &SimpleBus::transport_dbg); // TODO
-                        //s.register_nb_transport_fw(this, &SimpleBus::nb_transport_fw); // TODO
+                        s.register_transport_dbg(this, &SimpleBus::transport_dbg);
                 }
         }
 
@@ -57,21 +56,20 @@ struct SimpleBus : sc_core::sc_module
                         trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
                         return;
                 }
-
-                trans.set_address(ports[id]->global_to_local(addr));
+                // No need to change the address
+                // trans.set_address(ports[id]->global_to_local(addr));
                 isocks[id]->b_transport(trans, delay);
         }
 
         unsigned transport_dbg(tlm::tlm_generic_payload &trans) {
-                // receive Functional request from gem5 world, forward to memory directly
+                // receive Functional request from gem5 world
+                // forward to memory directly
                 auto addr = trans.get_address();
                 auto id = decode(addr);
                 if (id < 0) {
                         trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
                         return 0;
                 }
-                //std::cout << sc_time_stamp() << " [SimpleBus] forward "<< addr
-                //        <<  " to memory " << std::endl;
                 return isocks[id]->transport_dbg(trans);
         }
 };

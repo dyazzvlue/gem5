@@ -46,11 +46,10 @@ namespace Gem5SystemC
 {
 
 // forward declaration
-class Gem5SlaveTransactor;
-class Gem5SlaveTransactor_Multi;
+class Gem5SlaveTransactor;  // default transactor with a single socket
+class Gem5SlaveTransactor_Multi; // transactor with multiple socktes
 
 class BlockingPacketHelper;
-
 
 /**
  * Test that gem5 is at the same time as SystemC
@@ -127,7 +126,8 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
     void bindToTransactor(Gem5SlaveTransactor* transactor);
     void bindToTransactor(Gem5SlaveTransactor_Multi* transactor);
 
-    void updateCorePortMap(std::map<const std::string, std::list<gem5::RequestorID>> map);
+    void updateCorePortMap(std::map<const std::string,
+      std::list<gem5::RequestorID>> map);
 
     friend PayloadEvent<SCSlavePort>;
 };

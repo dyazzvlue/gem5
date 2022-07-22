@@ -47,12 +47,10 @@
 using namespace sc_core;
 using namespace sc_dt;
 
-#include "cli_parser.hh"
-#include "report_handler.hh"
-
-//#include "sc_target.hh"
 #include "bus_wrapper.h"
 #include "chi-memory.h"
+#include "cli_parser.hh"
+#include "report_handler.hh"
 #include "sim_control.hh"
 #include "simple_bus.h"
 #include "slave_transactor.hh"
@@ -136,9 +134,9 @@ sc_main(int argc, char **argv)
     CliParser parser;
     parser.parse(argc, argv);
 
-    //int core_num = parser.getCpuCores();
-    int core_num = 2;
-    std::cout << "Core num " << core_num << std::endl;
+    int core_num = parser.getCpuCores();
+    // int core_num = 2;
+
     assert (core_num > 0 && core_num <= 2);
 
     sc_core::sc_report_handler::set_handler(reportHandler);
@@ -151,23 +149,20 @@ sc_main(int argc, char **argv)
     //unsigned long long int memorySize = 512*1024*1024ULL;
     unsigned long long int memorySize = 2048*1024*1024ULL;
     unsigned long long int mem_start_addr = 0x00000000;
+    // For FS model, memory address should start at 0x80000000
+    // using  "-o 2147483648"
     if (parser.getMemoryOffset() != 0){
       mem_start_addr = parser.getMemoryOffset();
     }
     //unsigned long long int mem_start_addr = 0x80000000;
     unsigned long long int mem_end_addr = mem_start_addr + memorySize - 1;
-
-
-    //Gem5SystemC::Gem5SlaveTransactor transactor0("transactor0", "transactor0");
-    //Gem5SystemC::Gem5SlaveTransactor transactor1("transactor1", "transactor1");
-    //Gem5SystemC::Gem5SlaveTransactor external_tlm_memory("external_tlm_memory",
-    //        "external_tlm_memory");
+    
     Gem5SystemC::Gem5SlaveTransactor_Multi transactor("transactor",
             "transactor",core_num);
     /*
         Setting external systemc world
-
     */
+
     SimpleBus<4,1> bus("SimpleBus");
 
     bus.ports[0] = new PortMapping(mem_start_addr, mem_end_addr);
@@ -180,9 +175,6 @@ sc_main(int argc, char **argv)
     TxnRouter system_port("system_port", mem_start_addr,
                          memorySize, parser.getVerboseFlag());
 
-    //BusWrapper bus_wrapper("bus_wrapper", mem_start_addr,
-    //                     memorySize, parser.getVerboseFlag());
-
     // Using CHI cache model
     cache_chi<NODE_ID_RNF0, CACHE_SIZE> rnf0("rnf0");
     cache_chi<NODE_ID_RNF1, CACHE_SIZE> rnf1("rnf1");
@@ -192,8 +184,9 @@ sc_main(int argc, char **argv)
 
     SimpleMemory mem("SimpleMemory", memorySize, mem_start_addr, mem_end_addr);
 
-    // connect chi components
-
+    /*
+        connect chi components
+    */
     // connenct gem5 world to txn_router
     bus.isocks[0].bind(mem.tsock);
 
@@ -201,14 +194,13 @@ sc_main(int argc, char **argv)
     transactor.sockets[1].bind(txn_router0.tsock);
     transactor.sockets[2].bind(txn_router1.tsock);
 
-    //transactor1.socket.bind(txn_router1.tsock);
-    //external_tlm_memory.socket.bind(bus_wrapper.tsock);
-
     txn_router0.isock_mem(rnf0.target_socket);
     txn_router1.isock_mem(rnf1.target_socket);
 
     txn_router0.isock_bus(bus.tsocks[0]);
     txn_router1.isock_bus(bus.tsocks[1]);
+
+    // TODO
     system_port.isock_bus(bus.tsocks[2]);
     system_port.isock_mem(bus.tsocks[3]);
 
@@ -220,8 +212,6 @@ sc_main(int argc, char **argv)
     sn.init_socket(mem.tsock_sn);
 
     transactor.sim_control.bind(sim_control);
-    //transactor1.sim_control.bind(sim_control);
-    //external_tlm_memory.sim_control.bind(sim_control);
 
     SC_REPORT_INFO("sc_main", "Start of Simulation");
 

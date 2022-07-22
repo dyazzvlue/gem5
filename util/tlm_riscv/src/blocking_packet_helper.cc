@@ -12,7 +12,6 @@ void BlockingPacketHelper::init(unsigned int _num)
 {
     this->socket_num = _num;
     for (unsigned int i =0; i <= this->socket_num; i++){
-        std::cout << "Init BlockingPacket helper " << i << std::endl;
         std::pair<unsigned int, tlm::tlm_generic_payload*> p(i, nullptr);
         this->blockingRequestMap.insert(p);
         this->blockingResponseMap.insert(p);
@@ -97,7 +96,6 @@ bool BlockingPacketHelper::isBlocked(unsigned int core_id,  pktType type)
     }
     if (this->getBlockingTrans(core_id, type))
     {
-        std::cout << sc_core::sc_time_stamp() << " " << core_id << " blocked" << std::endl;
         return true;
     } else
     {
@@ -124,7 +122,6 @@ isBlockingTrans(tlm::tlm_generic_payload *blockingRequest, pktType type)
 
 bool BlockingPacketHelper::needToSendRequestRetry(unsigned int core_id)
 {
-    // TODO change to map.find()
     assert(core_id <= this->socket_num);
     auto iter = this->blockingResponseMap.find(core_id);
     if (iter != this->blockingResponseMap.end()){

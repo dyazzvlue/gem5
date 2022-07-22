@@ -26,7 +26,8 @@ class BlockingPacketHelper
                                                 pktType type);
         void init(unsigned int num);
         bool isBlocked(unsigned int core_id, pktType type);
-        bool isBlockingTrans(tlm::tlm_generic_payload *blockingRequest, pktType type);
+        bool isBlockingTrans(tlm::tlm_generic_payload *blockingRequest,
+                                pktType type);
 
         bool needToSendRequestRetry(unsigned int core_id);
         void updateRetryMap(unsigned int core_id, bool state);
@@ -43,8 +44,8 @@ class BlockingPacketHelper
     private:
         int socket_num;
         /**
-        * Using a map to save blocking transactions. Transaction will not be blocked when
-        * a packet from another core is processing.
+        * Using a map to save blocking transactions. Transaction will not be
+        * blocked when a packet from another core is processing.
         *
         * key: core id  value: tlm_genric_payload
         */
@@ -52,7 +53,8 @@ class BlockingPacketHelper
         std::map<unsigned int, tlm::tlm_generic_payload*> blockingResponseMap;
 
         std::map<unsigned int, bool> needToSendRequestRetryMap;
-        // if packet from system writeback/functional/interrupt port, always blocked
+        // if packet from system writeback/functional/interrupt port,
+        // always blocked
         bool isSystemPortBlocked = false;
 };
 

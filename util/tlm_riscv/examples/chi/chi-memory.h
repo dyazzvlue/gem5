@@ -60,25 +60,17 @@ struct SimpleMemory : public sc_core::sc_module, public load_if
 
         void write_data(unsigned addr, const uint8_t *src, unsigned num_bytes) {
                 assert(addr + num_bytes <= size);
-                //std::cout << "[chi-memory] write data" << std::endl;
                 memcpy(data + addr, src, num_bytes);
         }
 
         void read_data(unsigned addr, uint8_t *dst, unsigned num_bytes) {
                 assert(addr + num_bytes <= size);
-                //std::cout << "[chi-memory] read data" << std::endl;
                 memcpy(dst, data + addr, num_bytes);
         }
 
-        // TODO: the transaction address is in correct
         void transport_bus(tlm::tlm_generic_payload &trans, sc_core::sc_time &delay) {
-                std::cerr << sc_time_stamp() << " mem access through bus" << std::endl;
-                std::cerr << " trans addr: " << trans.get_address() 
-                        << " delay: " << delay << std::endl;
-                trans.set_address(trans.get_address() + mem_start_addr);
                 access_mux.lock();
                 transport(trans, delay);
-                std::cerr << "transport bus complete" << std::endl;
                 access_mux.unlock();
         }
 
@@ -90,7 +82,6 @@ struct SimpleMemory : public sc_core::sc_module, public load_if
         }
 
         unsigned transport_dbg(tlm::tlm_generic_payload &trans) {
-                //std::cout << sc_time_stamp() << "[CHI-Memory] transport_dbg " << std::endl;
                 tlm::tlm_command cmd = trans.get_command();
                 unsigned addr = trans.get_address();
                 auto *ptr = trans.get_data_ptr();
@@ -99,61 +90,24 @@ struct SimpleMemory : public sc_core::sc_module, public load_if
                 unsigned char *be = trans.get_byte_enable_ptr();
                 unsigned int be_len = trans.get_byte_enable_length();
 
-                //std::cout << "be " << be_len << " ; streaming_width " << streaming_width << std::endl;
                 if (streaming_width == 0) {
                         streaming_width = len;
                 }
-                /*
-                if (be_len || streaming_width) {
-                        // Slow path.
-                        std::cout << "[CHI-Memory] slow path " << std::endl;
-                        unsigned int pos;
+                if ((addr + len) > (mem_end_addr)) {
+                        trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
+                        SC_REPORT_FATAL("Memory", "Unsupported access\n");
+                        return 0;
+                }
 
-                        for (pos = 0; pos < len; pos++) {
-                                bool do_access = true;
-
-                                if (be_len) {
-                                        do_access = be[pos % be_len] == TLM_BYTE_ENABLED;
-                                }
-                                if (do_access) {
-                                        if ((addr + (pos % streaming_width)) >= sc_dt::uint64(size))   {
-                                                trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
-                                                SC_REPORT_FATAL("Memory", "Unsupported access\n");
-                                                return 0;
-                                        }
-
-                                        if (trans.is_read()) {
-                                                ptr[pos] = data[addr + (pos % streaming_width)];
-                                        } else {
-                                                data[addr + (pos % streaming_width)] = ptr[pos];
-                                        }
-                                }
-                        }
-                } else {
-                */
-                        //if ((addr + len) > (sc_dt::uint64(size)) {
-                        if ((addr + len) > (mem_end_addr)) {
-                                trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
-                                SC_REPORT_FATAL("Memory", "Unsupported access\n");
-                                return 0;
-                        }
-
-                        if (trans.get_command() == tlm::TLM_READ_COMMAND) {
-                                //std::cout << "[CHI-MEMROY] read data from addr: "
-                                //	<< addr << std::endl;
-                                //read_data(addr, ptr, len);
-                                read_data(addr - mem_start_addr, ptr, len);
-                        }
-                        else if (cmd == tlm::TLM_WRITE_COMMAND) {
-                                //std::cout << "[CHI-MEMROY] write data to addr: "
-                                //	<< addr << std::endl;
-                                //write_data(addr, ptr, len);
-                                write_data(addr - mem_start_addr, ptr, len);
-                        }
-                        else{
-                                SC_REPORT_FATAL("Memory", "Unsupported tlm command\n");
-                        }
-                //}
+                if (trans.get_command() == tlm::TLM_READ_COMMAND) {
+                        read_data(addr - mem_start_addr, ptr, len);
+                }
+                else if (cmd == tlm::TLM_WRITE_COMMAND) {
+                        write_data(addr - mem_start_addr, ptr, len);
+                }
+                else{
+                        SC_REPORT_FATAL("Memory", "Unsupported tlm command\n");
+                }
 
                 return len;
         }

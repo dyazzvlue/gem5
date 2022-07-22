@@ -76,6 +76,8 @@ class Gem5SlaveTransactor_Multi : public sc_core::sc_module
 
     /**
      * @brief vector of SCSlavaPort sockets
+     * The first socket is used to accept requests from gem5 system port.
+     * (write back; interrupt; functional)
      *
      */
     sc_core::sc_vector<init_port_type> sockets;
@@ -84,7 +86,7 @@ class Gem5SlaveTransactor_Multi : public sc_core::sc_module
 
   private:
     std::string portName;
-    unsigned int socket_num; // as same sa core num
+    unsigned int socket_num; // as same as core num
     unsigned int count = 0 ; // used for generate socket name
     std::string getNameForNewSocket(std::string name);
 
@@ -98,7 +100,6 @@ class Gem5SlaveTransactor_Multi : public sc_core::sc_module
     void before_end_of_elaboration();
     init_port_type* create_socket();
     unsigned int getSocketNum() {return socket_num;}
-
 
 };
 
