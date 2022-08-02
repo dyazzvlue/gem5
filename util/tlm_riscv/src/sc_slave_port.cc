@@ -100,8 +100,8 @@ SCSlavePort::recvAtomic(gem5::PacketPtr packet)
 
     /* Attach the packet pointer to the TLM transaction to keep track */
     Gem5Extension* extension = new Gem5Extension(packet);
-    unsigned int core_id = this->getCoreID(packet->requestorId());
-    extension->setCoreID(core_id);
+    unsigned int socket_id = this->getSocketId(packet->requestorId());
+    extension->setCoreID(socket_id);
     trans->set_auto_extension(extension);
 
     /* Execute b_transport: */
@@ -111,7 +111,7 @@ SCSlavePort::recvAtomic(gem5::PacketPtr packet)
         if (transactor != nullptr) {
             transactor->socket->b_transport(*trans, delay);
         } else if (transactor_multi != nullptr) {
-            transactor_multi->sockets[core_id]->b_transport(*trans, delay);
+            transactor_multi->sockets[socket_id]->b_transport(*trans, delay);
         } else{
             // no transactor , Exit
             SC_REPORT_FATAL("SCSlavePort", "No binded transactor, please check");
@@ -122,7 +122,7 @@ SCSlavePort::recvAtomic(gem5::PacketPtr packet)
         if (transactor != nullptr) {
             transactor->socket->b_transport(*trans, delay);
         } else if (transactor_multi != nullptr) {
-            transactor_multi->sockets[core_id]->b_transport(*trans, delay);
+            transactor_multi->sockets[socket_id]->b_transport(*trans, delay);
         } else {
             // no transactor , Exit
             SC_REPORT_FATAL("SCSlavePort", "No binded transactor, please check");
@@ -153,8 +153,8 @@ SCSlavePort::recvFunctional(gem5::PacketPtr packet)
 
     /* Attach the packet pointer to the TLM transaction to keep track */
     Gem5Extension* extension = new Gem5Extension(packet);
-    unsigned int core_id = this->getCoreID(packet->requestorId());
-    extension->setCoreID(core_id);
+    unsigned int socket_id = this->getSocketId(packet->requestorId());
+    extension->setCoreID(socket_id);
     trans->set_auto_extension(extension);
 
     /* Execute Debug Transport: */
@@ -162,7 +162,7 @@ SCSlavePort::recvFunctional(gem5::PacketPtr packet)
     if (transactor != nullptr) {
         bytes = transactor->socket->transport_dbg(*trans);
     } else if (transactor_multi != nullptr) {
-        bytes = transactor_multi->sockets[core_id]->transport_dbg(*trans);
+        bytes = transactor_multi->sockets[socket_id]->transport_dbg(*trans);
     } else {
         SC_REPORT_FATAL("SCSlavePort", "No binded transactor, please check");
     }
@@ -205,18 +205,18 @@ SCSlavePort::recvTimingReq(gem5::PacketPtr packet)
      * required */
     sc_assert(!needToSendRequestRetry);
 
-    unsigned int core_id = this->getCoreID(packet->requestorId()); // get coreid
+    unsigned int socket_id = this->getSocketId(packet->requestorId()); // get coreid
     /* Remember if a request comes in while we're blocked so that a retry
      * can be sent to gem5 */
 
     // only request from system port will be set to blocking request
-    if (blockingRequest) {
+    if (blockingRequest && usingGem5Cache) {
         needToSendRequestRetry = true;
         return false;
     }
-    // packet from core model will be set to blocking_packet_helper
-    if (blocking_packet_helper->isBlocked(core_id, pktType::Request)) {
-        blocking_packet_helper->updateRetryMap(core_id, true);
+    // packet from core model will be set to blk_pkt_helper
+    if (blk_pkt_helper->isBlockedPort(socket_id, pktType::Request)) {
+        blk_pkt_helper->updateRetryMap(socket_id, true);
         return false;
     }
 
@@ -238,7 +238,7 @@ SCSlavePort::recvTimingReq(gem5::PacketPtr packet)
     /* Attach the packet pointer to the TLM transaction to keep track */
     Gem5Extension* extension = new Gem5Extension(packet);
 
-    extension->setCoreID(core_id);
+    extension->setCoreID(socket_id);
     trans->set_auto_extension(extension);
     /*
      * Pay for annotated transport delays.
@@ -274,7 +274,7 @@ SCSlavePort::recvTimingReq(gem5::PacketPtr packet)
     if (transactor != nullptr){
         status = transactor->socket->nb_transport_fw(*trans, phase, delay);
     } else if (transactor_multi != nullptr) {
-        status = transactor_multi->sockets[core_id]->nb_transport_fw(*trans,
+        status = transactor_multi->sockets[socket_id]->nb_transport_fw(*trans,
                                                                 phase, delay);
     }else {
         SC_REPORT_FATAL("SCSlavePort", "No binded transactor, please check");
@@ -283,10 +283,10 @@ SCSlavePort::recvTimingReq(gem5::PacketPtr packet)
     if (status == tlm::TLM_ACCEPTED) {
         sc_assert(phase == tlm::BEGIN_REQ);
         /* Accepted but is now blocking until END_REQ (exclusion rule)*/
-        if (core_id == 0){ // transaction from system port
+        if (socket_id == 0 && usingGem5Cache){ // transaction from system port
             blockingRequest = trans;
         }else {
-            blocking_packet_helper->updateBlockingMap(core_id, trans,
+            blk_pkt_helper->updateBlockingMap(socket_id, trans,
                                                     pktType::Request);
         }
     } else if (status == tlm::TLM_UPDATED) {
@@ -314,12 +314,12 @@ SCSlavePort::pec(
     sc_time delay;
 
     if (phase == tlm::END_REQ ||
-              (blocking_packet_helper->isBlockingTrans(&trans, pktType::Request)
+              (blk_pkt_helper->isBlockingTrans(&trans, pktType::Request)
               && phase == tlm::BEGIN_RESP) ||
               (&trans == blockingRequest && phase == tlm::BEGIN_RESP)
               ) {
         // system port is blocked, send retry
-        if (&trans == blockingRequest){
+        if (&trans == blockingRequest && usingGem5Cache){
             sc_assert(&trans == blockingRequest);
             blockingRequest = NULL;
             if (needToSendRequestRetry) {
@@ -328,17 +328,17 @@ SCSlavePort::pec(
             }
         } else // cpu port is blocked, send retry
         {
-            sc_assert(blocking_packet_helper->isBlockingTrans(&trans,
+            sc_assert(blk_pkt_helper->isBlockingTrans(&trans,
                                                             pktType::Request));
             unsigned int core_id =
                                 Gem5Extension::getExtension(trans).getCoreID();
-            auto tmp = blocking_packet_helper->getBlockingTrans(core_id,
-                                                            pktType::Request);
-            blocking_packet_helper->updateBlockingMap(core_id, NULL,
+            //auto tmp = blk_pkt_helper->getBlockingTrans(core_id,
+            //                                                pktType::Request);
+            blk_pkt_helper->updateBlockingMap(core_id, NULL,
                                                     pktType::Request);
             /* Did another request arrive while blocked, schedule a retry */
-            if (blocking_packet_helper->needToSendRequestRetry(core_id)){
-                blocking_packet_helper->updateRetryMap(core_id, false);
+            if (blk_pkt_helper->needToSendRequestRetry(core_id)){
+                blk_pkt_helper->updateRetryMap(core_id, false);
                 sendRetryReq();
             }
         }
@@ -350,10 +350,10 @@ SCSlavePort::pec(
         auto& extension = Gem5Extension::getExtension(trans);
         auto packet = extension.getPacket();
         unsigned int core_id = extension.getCoreID();
-        if (core_id == 0){
+        if (core_id == 0 && usingGem5Cache){
             sc_assert(!blockingResponse);
         }else {
-            sc_assert(!blocking_packet_helper->getBlockingTrans(core_id,
+            sc_assert(!blk_pkt_helper->getBlockingTrans(core_id,
                                                             pktType::Response));
         }
 
@@ -371,10 +371,11 @@ SCSlavePort::pec(
         }
 
         if (need_retry) {
-            if (core_id == 0){
+            if (core_id == 0 && usingGem5Cache){
+            //if (core_id == 0){
                 blockingResponse = &trans;
             }else {
-                blocking_packet_helper->updateBlockingMap(core_id, &trans,
+                blk_pkt_helper->updateBlockingMap(core_id, &trans,
                                                         pktType::Response);
             }
         } else {
@@ -406,7 +407,7 @@ SCSlavePort::recvRespRetry()
 
     /* Retry a response */
     //sc_assert(blockingResponse);
-    auto response = blocking_packet_helper->getBlockingResponse();
+    auto response = blk_pkt_helper->getBlockingResponse();
     while (response != nullptr || blockingResponse != NULL) {
         tlm::tlm_generic_payload *trans;
         gem5::PacketPtr packet;
@@ -420,7 +421,7 @@ SCSlavePort::recvRespRetry()
             trans = response;
             packet = Gem5Extension::getExtension(trans).getPacket();
             core_id = Gem5Extension::getExtension(trans).getCoreID();
-            blocking_packet_helper->updateBlockingMap(core_id, NULL,
+            blk_pkt_helper->updateBlockingMap(core_id, NULL,
                                                     pktType::Response);
         }
 
@@ -442,7 +443,7 @@ SCSlavePort::recvRespRetry()
 
         // Release transaction with all the extensions
         trans->release();
-        response = blocking_packet_helper->getBlockingResponse();
+        response = blk_pkt_helper->getBlockingResponse();
     }
 }
 
@@ -465,7 +466,7 @@ SCSlavePort::SCSlavePort(const std::string &name_,
     needToSendRequestRetry(false),
     blockingResponse(NULL),
     transactor(nullptr),
-    blocking_packet_helper(new BlockingPacketHelper())
+    blk_pkt_helper(new BlockingPacketHelper())
 {
 
 }
@@ -491,6 +492,26 @@ SCSlavePort::bindToTransactor(Gem5SlaveTransactor_Multi* transactor)
         transactor->sockets[i].register_nb_transport_bw(this,
                                                 &SCSlavePort::nb_transport_bw);
     }
+    this->usingGem5Cache = transactor->isUsingGem5Cache(); //TODO
+    // initiate blocking packet helper
+    this->blk_pkt_helper->setUsingGem5Cache(
+                                            transactor->isUsingGem5Cache());
+    this->initSocketMap();
+    this->blk_pkt_helper->init(this->socket_map.size());
+    // print the socket map , TODO: can be removed
+    std::cout << "Print the socket port map" << std::endl;
+    auto iter = this->socket_map.begin();
+    while (iter != this->socket_map.end()){
+        auto it_2 = iter->second;
+        auto it_3 = it_2.begin();
+        while (it_3 != it_2.end()){
+            std::cout << iter->first << " " << *it_3<< std::endl;
+            it_3 ++;
+        }
+        iter ++;
+    }
+    std::cout << "==============================" <<std::endl;
+
 }
 
 gem5::ExternalSlave::ExternalPort*
@@ -501,35 +522,47 @@ SCSlavePortHandler::getExternalPort(const std::string &name,
     // Create and register a new SystemC slave port
     auto* port = new SCSlavePort(name, port_data, owner);
     control.registerSlavePort(port_data, port);
-
     return port;
 }
 
-unsigned int SCSlavePort::getCoreID(gem5::RequestorID id)
+unsigned int SCSlavePort::getSocketId(gem5::RequestorID id)
 {
-    unsigned int core_id = 0;
-    for (auto it = cpuPorts.begin();it != cpuPorts.end(); it++){
+    // TODO: different cpu can used same port is set as a cpu cluster
+    for (auto it = socket_map.begin();it != socket_map.end(); it++){
         auto it_find = std::find(it->second.begin(),it->second.end(),id);
         if (it_find != it->second.end()){
-            // TODO:
-            // socket0 is used for system port now, change it to a special tag
-            return core_id + 1;
-        }else{
-            core_id++;
+            if (this->usingGem5Cache){
+                // socket0 is used for system port
+                return it->first + 1;
+            }else {
+                return it->first;
+            }
         }
     }
-    // not found, is from system port
+    /* Packet from system requestor like functional or write back will use this
+     * socket. If not use gem5 cache, only functional packet will using this
+     * port. We can using the first socket to transfer the packet.
+     */
     return 0;
 }
 
 void SCSlavePort::
 updateCorePortMap(std::map<const std::string, std::list<gem5::RequestorID>> map)
 {
-    this->cpuPorts = map;
-    blocking_packet_helper->init(map.size() + 1);
+    std::cout << "Update the core port map" << std::endl;
+    this->cpu_port_map = map;
+    // init cpu_vec
+    auto it = this->cpu_port_map.begin();
+    while (it != this->cpu_port_map.end()){
+        this->cpu_vec.push_back(it->first);
+        it++;
+    }
+
     // print the map, TODO: can be removed
-    auto it = this->cpuPorts.begin();
-    while (it != this->cpuPorts.end()){
+    std::cout << "==============================" <<std::endl;
+    std::cout << "Print the core port map" << std::endl;
+    it = this->cpu_port_map.begin();
+    while (it != this->cpu_port_map.end()){
         auto it_2 = it->second;
         auto it_3 = it_2.begin();
         while (it_3 != it_2.end()){
@@ -538,6 +571,58 @@ updateCorePortMap(std::map<const std::string, std::list<gem5::RequestorID>> map)
         }
         it ++;
     }
+    std::cout << "==============================" <<std::endl;
+}
+
+void SCSlavePort::initSocketMap()
+{
+    if (transactor_multi == nullptr) {
+        // do nothing
+        return;
+    }
+    std::cout << "initSocketMap start " << std::endl;
+    std::map<unsigned int, std::vector<int>> config_map;
+    config_map = transactor_multi->getSocketCoreMap();
+    if (config_map.empty()){
+        // using default config
+        unsigned int count = 0;
+        std::cout << "using default " << std::endl;
+        auto iter = this->cpu_port_map.begin();
+        while (iter != this->cpu_port_map.end()){
+            auto requestorId_list = iter->second;
+            this->socket_map.insert(
+                std::pair<unsigned int, std::list<gem5::RequestorID>>
+                (count, requestorId_list));
+            count++;
+            iter++;
+        }
+    } else {
+        // set by config map
+        auto iter = config_map.begin();
+        while (iter != config_map.end()){
+            int socket_id = iter->first;
+            if (usingGem5Cache){
+                //socket_id++;
+            }
+            auto core_vec = iter->second;
+            std::cout << "using config file "<<std::endl;
+            for (int i = 0; i < core_vec.size(); i++){
+                int core_id = core_vec[i];
+                if (core_id >= this->cpu_vec.size()) { // TODO
+                    continue;
+                }
+                const std::string core_name = this->cpu_vec[core_id];
+                this->socket_map[socket_id].insert(
+                    this->socket_map[socket_id].end(),
+                    cpu_port_map[core_name].begin(),
+                    cpu_port_map[core_name].end()
+                );
+            }
+            iter++;
+        }
+
+    }
+    std::cout << "initSocketMap completed" << std::endl;
 }
 
 }

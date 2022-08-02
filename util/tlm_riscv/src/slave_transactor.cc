@@ -59,18 +59,26 @@ Gem5SlaveTransactor::before_end_of_elaboration()
 
 Gem5SlaveTransactor_Multi::Gem5SlaveTransactor_Multi(sc_core::sc_module_name name,
                                          const std::string& portName,
-                                         unsigned int socket_num)
+                                         unsigned int socket_num,
+                                         bool usingGem5Cache)
     : sc_core::sc_module(name),
       sockets(portName.c_str()),
       sim_control("sim_control"),
       portName(portName),
-      socket_num(socket_num + 1) // TODO, socket0 is used for system port
+      socket_num(socket_num),
+      usingGem5Cache(usingGem5Cache)
 {
+    if (usingGem5Cache) {
+        // If use gem5 cache , create a socket for system port
+        std::cout << "Using gem5 cache" << std::endl;
+        this->socket_num++;
+    }
     if (portName.empty()) {
         SC_REPORT_ERROR(name, "No port name specified!\n");
     }
     sockets.init(this->socket_num,
                 sc_bind(&Gem5SlaveTransactor_Multi::create_socket, this));
+
 }
 
 void

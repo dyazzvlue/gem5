@@ -58,7 +58,6 @@ class Gem5SlaveTransactor : public sc_core::sc_module
 
   private:
     std::string portName;
-    int socket_num;
 
   public:
     SC_HAS_PROCESS(Gem5SlaveTransactor);
@@ -84,22 +83,34 @@ class Gem5SlaveTransactor_Multi : public sc_core::sc_module
     // basic method
     sc_core::sc_port<Gem5SimControlInterface> sim_control;
 
+    // TODO: Rename
+    std::map<unsigned int, std::vector<int>> socket_core_map;
+
   private:
     std::string portName;
     unsigned int socket_num; // as same as core num
     unsigned int count = 0 ; // used for generate socket name
     std::string getNameForNewSocket(std::string name);
+    bool usingGem5Cache; // if using gem5 cache
+
 
   public:
     SC_HAS_PROCESS(Gem5SlaveTransactor);
 
     Gem5SlaveTransactor_Multi(sc_core::sc_module_name name,
                         const std::string& portName,
-                        unsigned int socket_num);
+                        unsigned int socket_num,
+                        bool usingGem5Cache = false);
 
     void before_end_of_elaboration();
     init_port_type* create_socket();
     unsigned int getSocketNum() {return socket_num;}
+    bool isUsingGem5Cache () {return this->usingGem5Cache;}
+    void setSocketCoreMap(std::map<unsigned int, std::vector<int>> map){
+        this->socket_core_map = map;
+    }
+    std::map<unsigned int, std::vector<int>> getSocketCoreMap()
+        { return this->socket_core_map;}
 
 };
 

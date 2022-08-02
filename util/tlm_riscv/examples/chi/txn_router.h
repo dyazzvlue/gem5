@@ -102,12 +102,14 @@ private:
         // receive TimingReq from gem5 world
         if (debug) {
             SC_REPORT_INFO(this->name(), "nb_transport_fw ");
-            std::cout<<  "Addr : " << trans.get_address() << std::endl;
+            std::cout<<  "Addr : " << std::setw(8) << std::hex 
+                << trans.get_address() << std::endl;
         }
         if (ToMem(trans)) {
             if (debug) {
                 SC_REPORT_INFO(this->name(), " receive to mem request ");
-                std::cout << "Addr : " << trans.get_address() << std::endl;
+                std::cout << "Addr : " << std::setw(8) << std::hex 
+                    << trans.get_address() << std::endl;
             }
             m_peq.notify(trans, phase, delay);
         }
@@ -151,7 +153,8 @@ private:
         delay = sc_time(10.0, SC_NS);
         if (debug){
            std::cout << sc_time_stamp() << " " << this->name()
-                << " send response addr: " << trans.get_address() << std::endl;
+                << " send response addr: " << std::setw(8) << std::hex 
+                << trans.get_address() << std::endl;
         }
         status = tsock->nb_transport_bw( trans, bw_phase, delay );
 
@@ -175,7 +178,8 @@ private:
         if (phase == tlm::BEGIN_REQ) {
             if (debug) {
                 SC_REPORT_INFO(this->name(), " Begin request");
-                std::cout << "Addr : " << trans.get_address() << std::endl;
+                std::cout << "Addr : " << std::setw(8) << std::hex << 
+                    trans.get_address() << std::endl;
             }
             trans.acquire();
             if (!transaction_in_progress) {
@@ -190,7 +194,8 @@ private:
             * allow other pending transactions to proceed */
             if (debug) {
                 SC_REPORT_INFO(this->name(), "end response");
-                std::cout << "Addr : " << trans.get_address() << std::endl;
+                std::cout << "Addr : " << std::setw(8) << std::hex << 
+                    trans.get_address() << std::endl;
             }
             if (!response_in_progress){
                 SC_REPORT_FATAL(this->name(), "Illegal transaction phase END RESP");
@@ -211,6 +216,7 @@ private:
                     std::cout << sc_time_stamp()
                         << this->name()
                         << " end_req_pending addr: "
+                        << std::setw(8) << std::hex
                         << end_req_pending->get_address()
                         << std::endl;
                 }
@@ -227,7 +233,8 @@ private:
     {
         if (debug) {
             SC_REPORT_INFO(this->name(), "send_end_req");
-            std::cout << "Addr : " << trans.get_address() << std::endl;
+            std::cout << "Addr : " << std::setw(8) << std::hex
+                << trans.get_address() << std::endl;
         }
         tlm::tlm_phase bw_phase;
         sc_time delay;
@@ -240,7 +247,8 @@ private:
         if (debug) {
             std::cout <<  sc_time_stamp() << this->name()
                 << " send_end_req nb_transport_bw "
-                <<" addr: " << trans.get_address() << std::endl;
+                <<" addr: " << std::setw(8) << std::hex 
+                << trans.get_address() << std::endl;
         }
         delay = delay + sc_time(15.0, SC_NS); // latency
         target_done_event.notify(delay);
@@ -255,7 +263,9 @@ private:
             wait(target_done_event);
             if (debug) {
                 SC_REPORT_INFO(this->name(), "execute transaction process");
-                std::cout << "Addr : " << transaction_in_progress->get_address() << std::endl;
+                std::cout << std::setw(8) << std::hex 
+                    << "Addr : " << transaction_in_progress->get_address() 
+                    << std::endl;
             }
             // Execute the read or write commands
             // In this case , forward to next IP by isock_mem;
@@ -268,8 +278,8 @@ private:
                 /* Target allows only two transactions in-flight */
                 if (next_response_pending)
                 {
-                    SC_REPORT_FATAL("TLM-2", "Attempt to have two pending responses"
-                                "in target");
+                    SC_REPORT_FATAL("TLM-2", "Attempt to have two pending "
+                                "responses in target");
                 }
                 next_response_pending = transaction_in_progress;
             }
@@ -285,7 +295,8 @@ private:
         // Forward the transaction to next component
         if (debug) {
             SC_REPORT_INFO(this->name(), " execute transaction");
-            std::cout << "Addr : " << trans.get_address() << std::endl;
+            std::cout << std::setw(8) << std::hex << "Addr : " 
+                << trans.get_address() << std::endl;
         }
         sc_time delay;
         delay = sc_time(10.0, SC_NS);

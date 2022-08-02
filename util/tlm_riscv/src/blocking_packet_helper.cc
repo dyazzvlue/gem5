@@ -11,6 +11,9 @@ BlockingPacketHelper::BlockingPacketHelper()
 void BlockingPacketHelper::init(unsigned int _num)
 {
     this->socket_num = _num;
+    if (usingGem5Cache) {
+        //this->socket_num++; // socket for system port
+    }
     for (unsigned int i =0; i <= this->socket_num; i++){
         std::pair<unsigned int, tlm::tlm_generic_payload*> p(i, nullptr);
         this->blockingRequestMap.insert(p);
@@ -25,8 +28,8 @@ updateBlockingMap(unsigned int core_id,
                     tlm::tlm_generic_payload *blocking_trans,
                     pktType type)
 {
-    assert (core_id < this->socket_num);
-    if (core_id == 0){ // system port
+    assert (core_id <= this->socket_num);
+    if (core_id == 0 && usingGem5Cache){ // system port
         if (blocking_trans == NULL){
             this->isSystemPortBlocked = false;
         }else{
@@ -89,7 +92,7 @@ BlockingPacketHelper::getBlockingTrans(unsigned int core_id,
     return NULL;
 }
 
-bool BlockingPacketHelper::isBlocked(unsigned int core_id,  pktType type)
+bool BlockingPacketHelper::isBlockedPort(unsigned int core_id,  pktType type)
 {
     if (isSystemPortBlocked) {
         return true;
@@ -122,9 +125,11 @@ isBlockingTrans(tlm::tlm_generic_payload *blockingRequest, pktType type)
 
 bool BlockingPacketHelper::needToSendRequestRetry(unsigned int core_id)
 {
-    assert(core_id <= this->socket_num);
-    auto iter = this->blockingResponseMap.find(core_id);
-    if (iter != this->blockingResponseMap.end()){
+    assert(core_id < this->socket_num);
+    //auto iter = this->blockingResponseMap.find(core_id);
+    //if (iter != this->blockingResponseMap.end()){
+    auto iter = this->needToSendRequestRetryMap.find(core_id);
+    if (iter != this->needToSendRequestRetryMap.end()){
         return iter->second;
     }
     // Not found, should throw exception?

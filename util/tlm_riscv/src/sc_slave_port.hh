@@ -93,6 +93,8 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
      */
     tlm::tlm_generic_payload *blockingResponse;
 
+    bool usingGem5Cache = false;
+
   protected:
     /** The gem5 Port slave interface */
     gem5::Tick recvAtomic(gem5::PacketPtr packet);
@@ -104,14 +106,16 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
 
     Gem5SlaveTransactor* transactor;
     Gem5SlaveTransactor_Multi* transactor_multi;
-    BlockingPacketHelper* blocking_packet_helper;
+    BlockingPacketHelper* blk_pkt_helper;
 
-    unsigned int getCoreID(gem5::RequestorID id);
+    unsigned int getSocketId(gem5::RequestorID id);
 
      /*
      * Keep track of the request port of cores
      */
-    std::map<const std::string, std::list<gem5::RequestorID>> cpuPorts;
+    std::map<const std::string, std::list<gem5::RequestorID>> cpu_port_map;
+    std::map<unsigned int, std::list<gem5::RequestorID>> socket_map;
+    std::vector<std::string> cpu_vec;
 
   public:
     /** The TLM initiator interface */
@@ -128,6 +132,8 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
 
     void updateCorePortMap(std::map<const std::string,
       std::list<gem5::RequestorID>> map);
+    // initiate socket map depends on config file // TODO
+    void initSocketMap();
 
     friend PayloadEvent<SCSlavePort>;
 };

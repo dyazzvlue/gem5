@@ -25,12 +25,14 @@ class BlockingPacketHelper
         tlm::tlm_generic_payload* getBlockingTrans(unsigned int core_id,
                                                 pktType type);
         void init(unsigned int num);
-        bool isBlocked(unsigned int core_id, pktType type);
+        bool isBlockedPort(unsigned int core_id, pktType type);
         bool isBlockingTrans(tlm::tlm_generic_payload *blockingRequest,
                                 pktType type);
 
         bool needToSendRequestRetry(unsigned int core_id);
         void updateRetryMap(unsigned int core_id, bool state);
+
+        void setUsingGem5Cache(bool state) {this->usingGem5Cache = state;}
 
         /**
          * @brief Get the Blocking Response object
@@ -53,9 +55,23 @@ class BlockingPacketHelper
         std::map<unsigned int, tlm::tlm_generic_payload*> blockingResponseMap;
 
         std::map<unsigned int, bool> needToSendRequestRetryMap;
+
+        /**
+        * A transaction after BEGIN_REQ has been sent but before END_REQ, which
+        * is blocking the request channel (Exlusion Rule, see IEEE1666)
+        */
+        tlm::tlm_generic_payload *blockingRequest;
+        /**
+        * Did another gem5 request arrive while currently blocked?
+        * This variable is needed when a retry should happen
+        */
+        bool needToSendRequestRetry_;
+
         // if packet from system writeback/functional/interrupt port,
         // always blocked
         bool isSystemPortBlocked = false;
+        // if using gem5 cache
+        bool usingGem5Cache = false;
 };
 
 }
