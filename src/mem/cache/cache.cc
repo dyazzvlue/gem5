@@ -916,7 +916,7 @@ Cache::cleanEvictBlk(CacheBlk *blk)
     // Creating a zero sized write, a message to the snoop filter
     RequestPtr req = std::make_shared<Request>(
         regenerateBlkAddr(blk), blkSize, 0, Request::wbRequestorId);
-
+    req->setCpuClusterId(this->cpuClusterId);
     if (blk->isSecure())
         req->setFlags(Request::SECURE);
 

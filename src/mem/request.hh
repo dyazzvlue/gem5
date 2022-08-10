@@ -91,8 +91,8 @@ class Packet;
 class Request;
 class ThreadContext;
 
-typedef std::shared_ptr<Request> RequestPtr;
 typedef uint16_t RequestorID;
+typedef std::shared_ptr<Request> RequestPtr;
 
 class Request
 {
@@ -382,6 +382,13 @@ class Request
      * that are capable of issuing a transaction
      */
     RequestorID _requestorId = invldRequestorId;
+
+    /**
+     * Cluster id used in tlm co-simulation, in order to track where the 
+     * write back requests come from.
+     *
+     */
+    CpuClusterID _cpuClusterId = InvalidCpuClusterID;
 
     /** Flag structure for the request. */
     Flags _flags;
@@ -787,6 +794,25 @@ class Request
     requestorId() const
     {
         return _requestorId;
+    }
+
+    /** Accesssor for the core cluster id */
+    CpuClusterID
+    cpuClusterId() const
+    {
+        return _cpuClusterId;
+    }
+
+    void
+    setCpuClusterId(CpuClusterID id)
+    {
+        _cpuClusterId = id;
+    }
+
+    bool
+    hasCpuClusterId()
+    {
+        return (_cpuClusterId != InvalidCpuClusterID);
     }
 
     uint32_t

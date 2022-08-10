@@ -108,13 +108,13 @@ class SCSlavePort : public gem5::ExternalSlave::ExternalPort
     Gem5SlaveTransactor_Multi* transactor_multi;
     BlockingPacketHelper* blk_pkt_helper;
 
-    unsigned int getSocketId(gem5::RequestorID id);
+    uint32_t getSocketId(gem5::RequestorID id);
 
      /*
      * Keep track of the request port of cores
      */
     std::map<const std::string, std::list<gem5::RequestorID>> cpu_port_map;
-    std::map<unsigned int, std::list<gem5::RequestorID>> socket_map;
+    std::map<uint32_t, std::list<gem5::RequestorID>> socket_map;
     std::vector<std::string> cpu_vec;
 
   public:

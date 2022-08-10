@@ -59,7 +59,7 @@ Gem5SlaveTransactor::before_end_of_elaboration()
 
 Gem5SlaveTransactor_Multi::Gem5SlaveTransactor_Multi(sc_core::sc_module_name name,
                                          const std::string& portName,
-                                         unsigned int socket_num,
+                                         uint32_t socket_num,
                                          bool usingGem5Cache)
     : sc_core::sc_module(name),
       sockets(portName.c_str()),

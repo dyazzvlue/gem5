@@ -8,23 +8,23 @@ BlockingPacketHelper::BlockingPacketHelper()
 }
 
 
-void BlockingPacketHelper::init(unsigned int _num)
+void BlockingPacketHelper::init(uint32_t _num)
 {
     this->socket_num = _num;
     if (usingGem5Cache) {
         //this->socket_num++; // socket for system port
     }
-    for (unsigned int i =0; i <= this->socket_num; i++){
-        std::pair<unsigned int, tlm::tlm_generic_payload*> p(i, nullptr);
+    for (uint32_t i =0; i <= this->socket_num; i++){
+        std::pair<uint32_t, tlm::tlm_generic_payload*> p(i, nullptr);
         this->blockingRequestMap.insert(p);
         this->blockingResponseMap.insert(p);
-        std::pair<unsigned int, bool> p2(i, false);
+        std::pair<uint32_t, bool> p2(i, false);
         this->needToSendRequestRetryMap.insert(p2);
     }
 }
 
 void BlockingPacketHelper::
-updateBlockingMap(unsigned int core_id,
+updateBlockingMap(uint32_t core_id,
                     tlm::tlm_generic_payload *blocking_trans,
                     pktType type)
 {
@@ -36,7 +36,7 @@ updateBlockingMap(unsigned int core_id,
             this->isSystemPortBlocked = true;
         }
     }
-    std::map<unsigned int, tlm::tlm_generic_payload*>::iterator iter;
+    std::map<uint32_t, tlm::tlm_generic_payload*>::iterator iter;
     switch (type)
     {
     case Request: // TODO
@@ -62,11 +62,11 @@ updateBlockingMap(unsigned int core_id,
 }
 
 tlm::tlm_generic_payload*
-BlockingPacketHelper::getBlockingTrans(unsigned int core_id,
+BlockingPacketHelper::getBlockingTrans(uint32_t core_id,
                                         pktType type)
 {
     assert (core_id < this->socket_num);
-    std::map<unsigned int, tlm::tlm_generic_payload*>::iterator iter;
+    std::map<uint32_t, tlm::tlm_generic_payload*>::iterator iter;
     switch ( (type))
     {
     case Request:
@@ -92,7 +92,7 @@ BlockingPacketHelper::getBlockingTrans(unsigned int core_id,
     return NULL;
 }
 
-bool BlockingPacketHelper::isBlockedPort(unsigned int core_id,  pktType type)
+bool BlockingPacketHelper::isBlockedPort(uint32_t core_id,  pktType type)
 {
     if (isSystemPortBlocked) {
         return true;
@@ -123,7 +123,7 @@ isBlockingTrans(tlm::tlm_generic_payload *blockingRequest, pktType type)
     return false;
 }
 
-bool BlockingPacketHelper::needToSendRequestRetry(unsigned int core_id)
+bool BlockingPacketHelper::needToSendRequestRetry(uint32_t core_id)
 {
     assert(core_id < this->socket_num);
     //auto iter = this->blockingResponseMap.find(core_id);
@@ -137,15 +137,15 @@ bool BlockingPacketHelper::needToSendRequestRetry(unsigned int core_id)
     return false;
 }
 
-void BlockingPacketHelper::updateRetryMap(unsigned int core_id,
+void BlockingPacketHelper::updateRetryMap(uint32_t core_id,
                                         bool state)
 {
     assert(core_id < this->socket_num);
     auto it = this->needToSendRequestRetryMap.begin();
     while (it != this->needToSendRequestRetryMap.end()){
         if (it->first == core_id) {
-            std::cout << sc_core::sc_time_stamp() << " update retry map " <<
-                    core_id << " to " << state << std::endl;
+           // std::cout << sc_core::sc_time_stamp() << " update retry map " <<
+            //        core_id << " to " << state << std::endl;
             it->second = state;
         }
         it++;

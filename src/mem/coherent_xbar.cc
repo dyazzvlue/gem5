@@ -62,6 +62,7 @@ CoherentXBar::CoherentXBar(const CoherentXBarParams &p)
       maxRoutingTableSizeCheck(p.max_routing_table_size),
       pointOfCoherency(p.point_of_coherency),
       pointOfUnification(p.point_of_unification),
+      snoopGroupId(p.snoop_group_id),
 
       ADD_STAT(snoops, statistics::units::Count::get(), "Total snoops"),
       ADD_STAT(snoopTraffic, statistics::units::Byte::get(), "Total snoop traffic"),
@@ -134,6 +135,10 @@ CoherentXBar::init()
                     p->getPeer());
             snoopPorts.push_back(p);
         }
+        DPRINTF(AddrRanges, "init coherentXbar name:  %s\n",
+                    p->name());
+        DPRINTF(AddrRanges, "init coherentXbar id:  %s\n",
+                    p->getId());
     }
 
     if (snoopPorts.empty())
@@ -143,6 +148,7 @@ CoherentXBar::init()
     // its own internal representation
     if (snoopFilter)
         snoopFilter->setCPUSidePorts(cpuSidePorts);
+        
 }
 
 bool
@@ -644,7 +650,7 @@ CoherentXBar::recvTimingSnoopResp(PacketPtr pkt, PortID cpu_side_port_id)
         }
 
         [[maybe_unused]] bool success =
-            memSidePorts[dest_port_id]->sendTimingSnoopResp(pkt);
+            memSidePorts[dest_port_id]->sendTimingSnoopResp(pkt);   
         pktCount[cpu_side_port_id][dest_port_id]++;
         pktSize[cpu_side_port_id][dest_port_id] += pkt_size;
         assert(success);

@@ -152,10 +152,16 @@ class BaseCache(ClockedObject):
     # data cache.
     write_allocator = Param.WriteAllocator(NULL, "Write allocator")
 
+    # cpu sluster id 
+    cpu_cluster_id = Param.Int(-1, "Id of related cpu_cluster")
+    snoop_group_id = Param.Int(-1, "Snoop group id")
+
+
 class Cache(BaseCache):
     type = 'Cache'
     cxx_header = 'mem/cache/cache.hh'
     cxx_class = 'gem5::Cache'
+    cpu_cluster_id = 0
 
 class NoncoherentCache(BaseCache):
     type = 'NoncoherentCache'
@@ -165,4 +171,5 @@ class NoncoherentCache(BaseCache):
     # This is typically a last level cache and any clean
     # writebacks would be unnecessary traffic to the main memory.
     writeback_clean = False
+    cpu_cluster_id = 0
 

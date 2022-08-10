@@ -172,6 +172,16 @@ class CoherentXBar : public BaseXBar
          */
         bool isSnooping() const override { return true; }
 
+        /**
+         * @brief Get the Snooping Group Id object
+         * 
+         * @return SnoopGroupID 
+         */
+        SnoopGroupID getSnoopingGroupId() const override
+        {
+            return xbar.snoopGroupId;
+        }
+
         bool
         recvTimingResp(PacketPtr pkt) override
         {
@@ -291,6 +301,9 @@ class CoherentXBar : public BaseXBar
 
     /** Is this crossbar the point of unification? **/
     const bool pointOfUnification;
+
+    /** Snoop group id **/
+    const SnoopGroupID snoopGroupId;
 
     /**
      * Upstream caches need this packet until true is returned, so

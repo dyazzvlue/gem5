@@ -69,7 +69,7 @@ SnoopFilter::lookupRequest(const Packet* cpkt, const ResponsePort&
 {
     DPRINTF(SnoopFilter, "%s: src %s packet %s\n", __func__,
             cpu_side_port.name(), cpkt->print());
-
+    DPRINTF(SnoopFilter, "Pkt requestor id is  %s", cpkt->requestorId());
     // check if the packet came from a cache
     bool allocate = !cpkt->req->isUncacheable() && cpu_side_port.isSnooping()
         && cpkt->fromCache();
@@ -113,8 +113,21 @@ SnoopFilter::lookupRequest(const Packet* cpkt, const ResponsePort&
 
     // If we are not allocating, we are done
     if (!allocate)
+    {
+        /*
+        auto port_list = maskToPortList(interested & ~req_port);
+        if (cpkt->hasCpuClusterId()){
+            auto res_list = getPortListBySnoopGroupId(port_list,
+                                                cpkt->cpuClusterId());
+            return snoopSelected(res_list, lookupLatency);
+        }else{
+            return snoopSelected(port_list,lookupLatency);
+        }
+        */
         return snoopSelected(maskToPortList(interested & ~req_port),
                              lookupLatency);
+    }
+        
 
     if (cpkt->needsResponse()) {
         if (!cpkt->cacheResponding()) {
@@ -153,7 +166,17 @@ SnoopFilter::lookupRequest(const Packet* cpkt, const ResponsePort&
         }
     }
 
-    return snoopSelected(maskToPortList(interested & ~req_port), lookupLatency);
+    //return snoopSelected(maskToPortList(interested & ~req_port), lookupLatency);
+    
+    auto port_list = maskToPortList(interested & ~req_port);
+    if (cpkt->hasCpuClusterId()){
+        auto res_list = getPortListBySnoopGroupId(port_list,
+                                                cpkt->cpuClusterId());
+        return snoopSelected(res_list, lookupLatency);
+    }else{
+        return snoopSelected(port_list,lookupLatency);
+    }
+    
 }
 
 void

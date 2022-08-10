@@ -36,7 +36,8 @@ Import('deps')
 env = env.Clone()
 env.Append(CPPPATH=['#chi'])
 
-src = [File('main.cc')]
+#src = [File('main.cc')]
+src = [File('main_no_gem5_cache.cc')]
 
 bin = env.Program('gem5.sc', src + deps)
 

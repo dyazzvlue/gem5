@@ -19,18 +19,18 @@ class BlockingPacketHelper
         virtual ~BlockingPacketHelper() {};
 
         // TODO: maybe change core_id to socket_id?
-        void updateBlockingMap(unsigned int core_id,
+        void updateBlockingMap(uint32_t core_id,
                             tlm::tlm_generic_payload *blocking_trans,
                             pktType type);
-        tlm::tlm_generic_payload* getBlockingTrans(unsigned int core_id,
+        tlm::tlm_generic_payload* getBlockingTrans(uint32_t core_id,
                                                 pktType type);
-        void init(unsigned int num);
-        bool isBlockedPort(unsigned int core_id, pktType type);
+        void init(uint32_t num);
+        bool isBlockedPort(uint32_t core_id, pktType type);
         bool isBlockingTrans(tlm::tlm_generic_payload *blockingRequest,
                                 pktType type);
 
-        bool needToSendRequestRetry(unsigned int core_id);
-        void updateRetryMap(unsigned int core_id, bool state);
+        bool needToSendRequestRetry(uint32_t core_id);
+        void updateRetryMap(uint32_t core_id, bool state);
 
         void setUsingGem5Cache(bool state) {this->usingGem5Cache = state;}
 
@@ -51,10 +51,10 @@ class BlockingPacketHelper
         *
         * key: core id  value: tlm_genric_payload
         */
-        std::map<unsigned int, tlm::tlm_generic_payload*> blockingRequestMap;
-        std::map<unsigned int, tlm::tlm_generic_payload*> blockingResponseMap;
+        std::map<uint32_t, tlm::tlm_generic_payload*> blockingRequestMap;
+        std::map<uint32_t, tlm::tlm_generic_payload*> blockingResponseMap;
 
-        std::map<unsigned int, bool> needToSendRequestRetryMap;
+        std::map<uint32_t, bool> needToSendRequestRetryMap;
 
         /**
         * A transaction after BEGIN_REQ has been sent but before END_REQ, which

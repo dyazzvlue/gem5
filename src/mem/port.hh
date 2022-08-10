@@ -113,6 +113,20 @@ class RequestPort: public Port, public AtomicRequestProtocol,
     virtual bool isSnooping() const { return false; }
 
     /**
+     * @brief Get the Snooping Group Id object
+     * Get the Snooping group id if is set. The default implementation return
+     * -1 and thus tells the neighbour that snoop all the related ports. Any
+     * request port that want to receive snoop requests in named range ports has
+     * to override this function(e.g. cache and coherenceXbar)
+     * 
+     * @return int 
+     */
+    virtual SnoopGroupID getSnoopingGroupId() const 
+    { 
+        return DefaultSnoopGroupID; 
+    }
+
+    /**
      * Get the address ranges of the connected responder port.
      */
     AddrRangeList getAddrRanges() const;
@@ -289,6 +303,9 @@ class ResponsePort : public Port, public AtomicResponseProtocol,
      * @return true if the peer request port is snooping
      */
     bool isSnooping() const { return _requestPort->isSnooping(); }
+
+    SnoopGroupID getSnoopingGroupId() const 
+    { return _requestPort->getSnoopingGroupId(); }
 
     /**
      * Called by the owner to send a range change

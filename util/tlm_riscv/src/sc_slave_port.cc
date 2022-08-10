@@ -57,7 +57,7 @@ packet2payload(gem5::PacketPtr packet, tlm::tlm_generic_payload &trans)
     /* Check if this transaction was allocated by mm */
     sc_assert(trans.has_mm());
 
-    unsigned int size = packet->getSize();
+    uint32_t size = packet->getSize();
     unsigned char *data = packet->getPtr<unsigned char>();
 
     trans.set_data_length(size);
@@ -100,7 +100,7 @@ SCSlavePort::recvAtomic(gem5::PacketPtr packet)
 
     /* Attach the packet pointer to the TLM transaction to keep track */
     Gem5Extension* extension = new Gem5Extension(packet);
-    unsigned int socket_id = this->getSocketId(packet->requestorId());
+    uint32_t socket_id = this->getSocketId(packet->requestorId());
     extension->setCoreID(socket_id);
     trans->set_auto_extension(extension);
 
@@ -153,12 +153,12 @@ SCSlavePort::recvFunctional(gem5::PacketPtr packet)
 
     /* Attach the packet pointer to the TLM transaction to keep track */
     Gem5Extension* extension = new Gem5Extension(packet);
-    unsigned int socket_id = this->getSocketId(packet->requestorId());
+    uint32_t socket_id = this->getSocketId(packet->requestorId());
     extension->setCoreID(socket_id);
     trans->set_auto_extension(extension);
 
     /* Execute Debug Transport: */
-    unsigned int bytes;
+    uint32_t bytes;
     if (transactor != nullptr) {
         bytes = transactor->socket->transport_dbg(*trans);
     } else if (transactor_multi != nullptr) {
@@ -198,14 +198,34 @@ SCSlavePort::recvTimingReq(gem5::PacketPtr packet)
     panic_if(packet->cacheResponding(), "Should not see packets where cache "
              "is responding");
 
+    if (!(packet->isRead() || packet->isWrite())){
+        std::cout << packet->cmdString() << std::endl;
+    }
     panic_if(!(packet->isRead() || packet->isWrite()),
              "Should only see read and writes at TLM memory\n");
 
     /* We should never get a second request after noting that a retry is
      * required */
     sc_assert(!needToSendRequestRetry);
+    // get target socket id
+    uint32_t socket_id = this->getSocketId(packet->requestorId()); 
 
-    unsigned int socket_id = this->getSocketId(packet->requestorId()); // get coreid
+   // if (packet->isWrite()){
+   //     std::cout << sc_time_stamp() << " recv packet, cmd: " << packet->cmdString() 
+   //         << " requestor id: " << packet->requestorId()
+   //         << " core cluster id: " << packet->cpuClusterId()
+   //         << " target socket id: " << socket_id 
+   //         << " addr: " << std::hex << packet->getAddr() << std::endl;
+   // }
+
+    if (packet->hasCpuClusterId()) {
+        if (packet->cpuClusterId() != socket_id){
+            std::cout << " setting socket id from " << socket_id 
+            << " to named cpuClusterId " << packet->cpuClusterId() << std::endl;
+            socket_id = packet->cpuClusterId();
+        }
+    }
+    
     /* Remember if a request comes in while we're blocked so that a retry
      * can be sent to gem5 */
 
@@ -330,7 +350,7 @@ SCSlavePort::pec(
         {
             sc_assert(blk_pkt_helper->isBlockingTrans(&trans,
                                                             pktType::Request));
-            unsigned int core_id =
+            uint32_t core_id =
                                 Gem5Extension::getExtension(trans).getCoreID();
             //auto tmp = blk_pkt_helper->getBlockingTrans(core_id,
             //                                                pktType::Request);
@@ -349,7 +369,7 @@ SCSlavePort::pec(
 
         auto& extension = Gem5Extension::getExtension(trans);
         auto packet = extension.getPacket();
-        unsigned int core_id = extension.getCoreID();
+        uint32_t core_id = extension.getCoreID();
         if (core_id == 0 && usingGem5Cache){
             sc_assert(!blockingResponse);
         }else {
@@ -411,7 +431,7 @@ SCSlavePort::recvRespRetry()
     while (response != nullptr || blockingResponse != NULL) {
         tlm::tlm_generic_payload *trans;
         gem5::PacketPtr packet;
-        unsigned int core_id;
+        uint32_t core_id;
         if (blockingResponse != NULL){
             trans = blockingResponse;
             blockingResponse = NULL;
@@ -525,7 +545,7 @@ SCSlavePortHandler::getExternalPort(const std::string &name,
     return port;
 }
 
-unsigned int SCSlavePort::getSocketId(gem5::RequestorID id)
+uint32_t SCSlavePort::getSocketId(gem5::RequestorID id)
 {
     // TODO: different cpu can used same port is set as a cpu cluster
     for (auto it = socket_map.begin();it != socket_map.end(); it++){
@@ -581,17 +601,17 @@ void SCSlavePort::initSocketMap()
         return;
     }
     std::cout << "initSocketMap start " << std::endl;
-    std::map<unsigned int, std::vector<int>> config_map;
+    std::map<uint32_t, std::vector<int>> config_map;
     config_map = transactor_multi->getSocketCoreMap();
     if (config_map.empty()){
         // using default config
-        unsigned int count = 0;
+        uint32_t count = 0;
         std::cout << "using default " << std::endl;
         auto iter = this->cpu_port_map.begin();
         while (iter != this->cpu_port_map.end()){
             auto requestorId_list = iter->second;
             this->socket_map.insert(
-                std::pair<unsigned int, std::list<gem5::RequestorID>>
+                std::pair<uint32_t, std::list<gem5::RequestorID>>
                 (count, requestorId_list));
             count++;
             iter++;

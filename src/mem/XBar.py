@@ -130,6 +130,8 @@ class CoherentXBar(BaseXBar):
 
     system = Param.System(Parent.any, "System that the crossbar belongs to.")
 
+    snoop_group_id = Param.Int(-1, "Snoop group id")
+
 class SnoopFilter(SimObject):
     type = 'SnoopFilter'
     cxx_header = "mem/snoop_filter.hh"

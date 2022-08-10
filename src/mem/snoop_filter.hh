@@ -256,6 +256,13 @@ class SnoopFilter : public SimObject
      */
     SnoopList maskToPortList(SnoopMask ports) const;
 
+    /**
+     * Get corresponing list of ports by SnoopGroupId
+     * @param list SnoopList containing all the requested ResponsePorts
+     * @return SnoopList which has same snoop group id
+     */
+    SnoopList getPortListBySnoopGroupId(SnoopList list, SnoopGroupID id) const;
+
   private:
 
     /**
@@ -348,6 +355,35 @@ SnoopFilter::maskToPortList(SnoopMask port_mask) const
     for (const auto& p : cpuSidePorts)
         if ((port_mask & portToMask(*p)).any())
             res.push_back(p);
+    return res;
+}
+
+inline SnoopFilter::SnoopList
+SnoopFilter::getPortListBySnoopGroupId(SnoopFilter::SnoopList list, 
+    SnoopGroupID id) const
+{
+    SnoopList res;
+    if (id == -1){
+        return list;
+    }
+    for (const auto& p : list) {
+        if (p->getSnoopingGroupId() == -1){
+            // not set, snoop this port by default
+            res.push_back(p);
+        }
+        else if (p->getSnoopingGroupId() == id){
+            std::cout << "Find snooping port: " << p->name() <<
+             ", group id "<<  id << " peer port " << p->getPeer() 
+             << std::endl;
+            res.push_back(p);
+        }else{
+            //std::cout << "Not Found " << p->name() << " id " 
+            //<< p->getSnoopingGroupId() << " target id " << id << std::endl;
+            // do nothing 
+            // TODO: If not added, crash will happened in process init 
+            res.push_back(p);
+        }
+    }
     return res;
 }
 

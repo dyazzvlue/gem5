@@ -252,6 +252,18 @@ const ContextID InvalidContextID = (ContextID)-1;
 typedef int16_t PortID;
 const PortID InvalidPortID = (PortID)-1;
 
+/**
+ * Snoop group index. For each ports in same snoop_group, snoop filter will 
+ * send snoop request if snooping is required.
+ * 
+ */
+
+typedef int16_t SnoopGroupID;
+const SnoopGroupID DefaultSnoopGroupID = SnoopGroupID(-1);
+
+typedef int16_t CpuClusterID;
+const CpuClusterID InvalidCpuClusterID = CpuClusterID(-1);
+
 class FaultBase;
 typedef std::shared_ptr<FaultBase> Fault;
 

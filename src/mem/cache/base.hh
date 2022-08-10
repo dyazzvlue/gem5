@@ -151,6 +151,9 @@ class BaseCache : public ClockedObject
      */
     class CacheRequestPort : public QueuedRequestPort
     {
+      private:
+        /** A reference to the cache to which this port belongs. */
+        BaseCache* cache;
 
       public:
 
@@ -168,8 +171,9 @@ class BaseCache : public ClockedObject
 
         CacheRequestPort(const std::string &_name, BaseCache *_cache,
                         ReqPacketQueue &_reqQueue,
-                        SnoopRespPacketQueue &_snoopRespQueue) :
-            QueuedRequestPort(_name, _cache, _reqQueue, _snoopRespQueue)
+                        SnoopRespPacketQueue &_snoopRespQueue) : 
+            QueuedRequestPort(_name, _cache, _reqQueue, _snoopRespQueue),
+            cache(_cache)
         { }
 
         /**
@@ -178,6 +182,16 @@ class BaseCache : public ClockedObject
          * @return always true
          */
         virtual bool isSnooping() const { return true; }
+
+        /**
+         * @brief Get the Snooping Group Id object
+         * 
+         * @return SnoopGroupID 
+         */
+        SnoopGroupID getSnoopingGroupId() const override
+        {
+            return cache->snoopGroupId;
+        }
     };
 
     /**
@@ -980,6 +994,14 @@ class BaseCache : public ClockedObject
      * The address range to which the cache responds on the CPU side.
      * Normally this is all possible memory addresses. */
     const AddrRangeList addrRanges;
+
+    /**
+     * The id of cpu cluster which this cache belongs to.
+     * Only used in tlm co-simulation
+     */
+    CpuClusterID cpuClusterId;
+
+    SnoopGroupID snoopGroupId;
 
   public:
     /** System we are currently operating in. */
