@@ -44,6 +44,7 @@
 #include "sim/cxx_manager.hh"
 #include "sim/system.hh"
 #include "sim_control_if.hh"
+#include <memory.h>
 
 namespace Gem5SystemC
 {
@@ -58,6 +59,8 @@ namespace Gem5SystemC
  */
 class Gem5SimControl : public Module, public Gem5SimControlInterface
 {
+  //using Gem5SimControlPtr = std::unique_ptr<Gem5SystemC::Gem5SimControl>;
+  using Gem5SimControlPtr = Gem5SimControl*;
   protected:
     gem5::CxxConfigManager* config_manager;
     Gem5SystemC::Logger logger;
@@ -74,10 +77,11 @@ class Gem5SimControl : public Module, public Gem5SimControlInterface
     /*
      * Keep track of the request port of cores
      */
-   std::map<const std::string, std::list<gem5::RequestorID>> cpuPorts;
+    std::map<const std::string, std::list<gem5::RequestorID>> cpuPorts;
 
     /// Pointer to a previously created instance.
-    static Gem5SimControl* instance;
+    //static Gem5SimControl* instance;
+    static Gem5SimControlPtr instance;
 
     /** A callback that is called from the run thread before gem5 simulation is
      * started.
@@ -122,6 +126,11 @@ class Gem5SimControl : public Module, public Gem5SimControlInterface
     SCMasterPort* getMasterPort(const std::string& name) override;
 
     void end_of_elaboration();
+
+    static Gem5SimControlPtr getInstance(sc_core::sc_module_name name,
+                    const std::string& configFile,
+                    uint64_t simulationEnd,
+                    const std::string& gem5DebugFlags);
 
     /**
      * @brief Update core infomation for co-simulation

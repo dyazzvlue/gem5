@@ -91,26 +91,35 @@ class Gem5SlaveTransactor_Multi : public sc_core::sc_module
     uint32_t socket_num; // as same as core num
     uint32_t count = 0 ; // used for generate socket name
     std::string getNameForNewSocket(std::string name);
-    bool usingGem5Cache; // if using gem5 cache
 
+  protected:
+    static Gem5SlaveTransactor_Multi* instance;
 
   public:
     SC_HAS_PROCESS(Gem5SlaveTransactor);
 
+    /*
+     * Constructor
+     * This class has a public constructor. This class can be set as a 
+     * singleton if needed.
+     */ 
     Gem5SlaveTransactor_Multi(sc_core::sc_module_name name,
                         const std::string& portName,
-                        uint32_t socket_num,
-                        bool usingGem5Cache = false);
+                        uint32_t socket_num);
 
     void before_end_of_elaboration();
     init_port_type* create_socket();
     uint32_t getSocketNum() {return socket_num;}
-    bool isUsingGem5Cache () {return this->usingGem5Cache;}
+    bool isUsingGem5Cache () {return false;}
     void setSocketCoreMap(std::map<uint32_t, std::vector<int>> map){
         this->socket_core_map = map;
     }
     std::map<uint32_t, std::vector<int>> getSocketCoreMap()
         { return this->socket_core_map;}
+
+    static Gem5SlaveTransactor_Multi* getInstance(sc_core::sc_module_name name,
+                        const std::string& portName,
+                        uint32_t socket_num);
 
 };
 

@@ -56,7 +56,8 @@ std::string filename = "m5out/stats-systemc.txt";
 namespace Gem5SystemC
 {
 
-Gem5SimControl* Gem5SimControl::instance = nullptr;
+//Gem5SimControl* Gem5SimControl::instance = nullptr;
+Gem5SimControl::Gem5SimControlPtr Gem5SimControl::instance = nullptr;
 
 Gem5SimControl::Gem5SimControl(sc_core::sc_module_name name,
                                const std::string& configFile,
@@ -257,18 +258,35 @@ void Gem5SimControl::addCoreID(const std::string core_name, gem5::RequestorID id
 
 }
 
- unsigned int Gem5SimControl::getCoreIDByRequestorID(gem5::RequestorID id)
- {
-    unsigned int core_id = 0;
-    for (auto it = cpuPorts.begin();it != cpuPorts.end(); it++){
-        auto it_find = std::find(it->second.begin(),it->second.end(),id);
-        if (it_find != it->second.end()){
-            return core_id;
-        }else{
-            core_id++;
-        }
+unsigned int Gem5SimControl::getCoreIDByRequestorID(gem5::RequestorID id)
+{
+   unsigned int core_id = 0;
+   for (auto it = cpuPorts.begin();it != cpuPorts.end(); it++){
+       auto it_find = std::find(it->second.begin(),it->second.end(),id);
+       if (it_find != it->second.end()){
+           return core_id;
+       }else{
+          core_id++;
+       }
+   }
+   // not found, using default system port
+   return 0;
+}
+
+Gem5SimControl::Gem5SimControlPtr Gem5SimControl::getInstance(
+    sc_core::sc_module_name name,
+    const std::string& configFile,
+    uint64_t simulationEnd,
+    const std::string& gem5DebugFlags)
+{
+    if (instance == nullptr){
+        std::cout << "create new sim control instance" << std::endl;
+        instance = new Gem5SimControl(name, configFile,simulationEnd, gem5DebugFlags);
+    }else{
+        std::cout << "get existed sim control instance" << std::endl;
     }
-    // not found, using default system port
-    return 0;
- }
+    return instance;
+
+}
+
 }

@@ -57,28 +57,23 @@ Gem5SlaveTransactor::before_end_of_elaboration()
     port->bindToTransactor((Gem5SlaveTransactor*)this);
 }
 
+
+Gem5SlaveTransactor_Multi* Gem5SlaveTransactor_Multi::instance = nullptr;
+
 Gem5SlaveTransactor_Multi::Gem5SlaveTransactor_Multi(sc_core::sc_module_name name,
                                          const std::string& portName,
-                                         uint32_t socket_num,
-                                         bool usingGem5Cache)
+                                         uint32_t socket_num)
     : sc_core::sc_module(name),
       sockets(portName.c_str()),
       sim_control("sim_control"),
       portName(portName),
-      socket_num(socket_num),
-      usingGem5Cache(usingGem5Cache)
+      socket_num(socket_num)
 {
-    if (usingGem5Cache) {
-        // If use gem5 cache , create a socket for system port
-        std::cout << "Using gem5 cache" << std::endl;
-        this->socket_num++;
-    }
     if (portName.empty()) {
         SC_REPORT_ERROR(name, "No port name specified!\n");
     }
     sockets.init(this->socket_num,
                 sc_bind(&Gem5SlaveTransactor_Multi::create_socket, this));
-
 }
 
 void
@@ -104,6 +99,19 @@ std::string Gem5SlaveTransactor_Multi::getNameForNewSocket(std::string name)
     rename += std::to_string(count);
     count++;
     return rename;
+}
+
+Gem5SlaveTransactor_Multi* Gem5SlaveTransactor_Multi::getInstance(sc_core::sc_module_name name,
+                        const std::string& portName, uint32_t socket_num)
+{
+    if (instance == nullptr)
+    {
+        std::cout << "create new Gem5SlaveTransactor" << std::endl;
+        instance = new Gem5SlaveTransactor_Multi(name, portName, socket_num);
+    }else{
+        std::cout << "Return existed Gem5SlaveTransactor" << std::endl;
+    }
+    return instance;
 }
 
 }

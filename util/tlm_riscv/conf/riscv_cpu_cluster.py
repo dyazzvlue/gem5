@@ -60,10 +60,13 @@ args = parser.parse_args()
 '''
     2 cluster, each cluster has two cores 
 '''
-np = 2
+#np = 2
+#cluster_num = 2
+
+np = 1
 cluster_num = 2
 
-hasL2Cache = True
+hasL2Cache = False
 
 multiprocesses =[]
 multibinary = []
@@ -174,9 +177,10 @@ for i in range(cluster_num):
         # Set the command
         # cmd is a list which begins with the executable (like argv)
         #process.cmd = [multibinary[0]]
-        process.cmd = [binary7]
+        process.cmd = [binary6]
         multiprocesses.append(process)
         # Set the cpu to use the process as its workload and create thread contexts
+        
         system.cpu[core_id].workload = multiprocesses[core_id]
         system.cpu[core_id].createThreads()
 
