@@ -4,7 +4,7 @@ import os
 from conans import ConanFile, tools
 from os.path import isdir
 
-# python3 `which conan` create . demo/testing
+# python3 `which conan` create . demo/testing -o python_config="/usr/local/bin/python3-config"
 
 
 class Gem5Conan(ConanFile):
@@ -27,6 +27,7 @@ class Gem5Conan(ConanFile):
     default_options = {
         "fPIC": True,
         "CONANPKG": "OFF",
+        "buildGem5": False,
         "buildLib": True,
         "shared": True,
         "buildvariants": "opt",
@@ -63,9 +64,9 @@ class Gem5Conan(ConanFile):
         build_dir = "build/" + str(self.options.isa)
         print("build_target: ", build_target)
         print("build_dir: ", build_dir)
+        if not isdir(build_dir):
+            os.makedirs(build_dir)
         if (self.options.buildGem5):
-            if not isdir(build_dir):
-                os.makedirs(build_dir)
             with tools.chdir(build_dir):
                 # just build basic gem5
                 self.run('scons -u {} -j4'.format(build_target))
@@ -85,7 +86,7 @@ class Gem5Conan(ConanFile):
             if self.options.python_config != "" :
                 # using named python
                 PYTHON_CONFIG = ' PYTHON_CONFIG=' + str(self.options.python_config)
-                build_config + = PYTHON_CONFIG
+                build_config += PYTHON_CONFIG
             with tools.chdir(build_dir):
                 # build gem5 lib
                 self.run('scons {} -u {} -j4'.format(build_config, build_lib_target))
