@@ -14,13 +14,15 @@ class Gem5Conan(ConanFile):
     options = {
         "fPIC": [True, False],
         "CONANPKG": ["ON", "OFF"],
+        "buildGem5": [True, False],
         "buildLib": [True, False],
         "shared": [True, False],
         "buildvariants": ["debug", "opt", "fast"],
         "isa": ["RISCV", "ARM", "X86"],  # Other valid ISAS: MIPS, POWER, SPARC
         "cxxconfig": [True, False],
         "tcmalloc": [True, False],
-        "systemc": [True, False]
+        "systemc": [True, False],
+        "python_config": "ANY"
     }
     default_options = {
         "fPIC": True,
@@ -31,7 +33,8 @@ class Gem5Conan(ConanFile):
         "isa": "RISCV",
         "cxxconfig": True,
         "tcmalloc": False,
-        "systemc": False
+        "systemc": False,
+        "python_config": ""
     }
     version = "1.0"
     url = "https://gitlab.devtools.intel.com/syssim/cofluent"  # TODO
@@ -60,12 +63,12 @@ class Gem5Conan(ConanFile):
         build_dir = "build/" + str(self.options.isa)
         print("build_target: ", build_target)
         print("build_dir: ", build_dir)
-        if not isdir(build_dir):
-            os.makedirs(build_dir)
-        with tools.chdir(build_dir):
-            # just build basic gem5
-            # self.run('scons -u {} -j4'.format(build_target))
-            pass
+        if (self.options.buildGem5):
+            if not isdir(build_dir):
+                os.makedirs(build_dir)
+            with tools.chdir(build_dir):
+                # just build basic gem5
+                self.run('scons -u {} -j4'.format(build_target))
 
         if (self.options.buildLib == True):
             if (self.options.shared == True):  # recommended
@@ -79,6 +82,10 @@ class Gem5Conan(ConanFile):
             build_config += ' --with-cxx-config' if self.options.cxxconfig == True else ''
             build_config += ' --without-tcmalloc' if self.options.tcmalloc == False else ''
             build_config += ' USE_SYSTEMC=0' if self.options.systemc == False else ''
+            if self.options.python_config != "" :
+                # using named python
+                PYTHON_CONFIG = ' PYTHON_CONFIG=' + str(self.options.python_config)
+                build_config + = PYTHON_CONFIG
             with tools.chdir(build_dir):
                 # build gem5 lib
                 self.run('scons {} -u {} -j4'.format(build_config, build_lib_target))
