@@ -95,7 +95,8 @@ class Gem5Conan(ConanFile):
         #self.copy("*.h", "include", src="include")  # TODO
         #self.copy("*.lib", "lib", keep_path=False)
         #self.copy("*.a", "lib", keep_path=False)
-        self.copy("*", "RISCV", src="build/RISCV")
+        self.copy("*", "include", src="build/RISCV")
+        self.copt("*.so", "lib", src="build/RISCV")
 
     def package_info(self):
         self.cpp_info.name = "gem5"
