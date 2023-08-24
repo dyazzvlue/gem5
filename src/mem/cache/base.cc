@@ -110,6 +110,8 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       noTargetMSHR(nullptr),
       missCount(p.max_miss_count),
       addrRanges(p.addr_ranges.begin(), p.addr_ranges.end()),
+      cpuClusterId(p.cpu_cluster_id),
+      snoopGroupId(p.snoop_group_id),
       system(p.system),
       stats(*this)
 {
@@ -1701,6 +1703,7 @@ BaseCache::writebackBlk(CacheBlk *blk)
 
     RequestPtr req = std::make_shared<Request>(
         regenerateBlkAddr(blk), blkSize, 0, Request::wbRequestorId);
+    req->setCpuClusterId(this->cpuClusterId);
 
     if (blk->isSecure())
         req->setFlags(Request::SECURE);
@@ -1744,6 +1747,7 @@ BaseCache::writecleanBlk(CacheBlk *blk, Request::Flags dest, PacketId id)
 {
     RequestPtr req = std::make_shared<Request>(
         regenerateBlkAddr(blk), blkSize, 0, Request::wbRequestorId);
+    req->setCpuClusterId(this->cpuClusterId);
 
     if (blk->isSecure()) {
         req->setFlags(Request::SECURE);

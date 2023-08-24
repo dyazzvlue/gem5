@@ -410,10 +410,22 @@ for variant_path in variant_paths:
         # Enable -Wall and -Wextra and then disable the few warnings that
         # we consistently violate
         env.Append(CCFLAGS=['-Wall', '-Wundef', '-Wextra',
-                            '-Wno-sign-compare', '-Wno-unused-parameter'])
+                            '-Wno-sign-compare', '-Wno-unused-parameter',
+                            '-fno-lto'])
 
         # We always compile using C++17
         env.Append(CXXFLAGS=['-std=c++17'])
+        env.Append(CXXFLAGS=['-std=c++17'])
+        env.Append(CCFLAGS=['-flto'])
+        env.Append(CCFLAGS=['-fno-use-linker-plugin'])
+        env.Append(CCFLAGS=['-fno-lto'])
+        env.Append(CCFLAGS=['-fno-use-linker-plugin'])
+        env.Append(CXXFLAGS=['-fno-lto'])
+        env.Append(CXXFLAGS=['-fno-use-linker-plugin'])
+        env.Append(LINKFLAGS='-fno-lto')
+            # for virtual python envirnment. The python lib path should be given
+        env.Append(LIBPATH=[env['PYTHON_LIB_PATH']])
+        #main.Append(LIBPATH=['/nfs/site/proj/dpg/arch/perfhome/python/miniconda37/lib/'])
 
         if sys.platform.startswith('freebsd'):
             env.Append(CCFLAGS=['-I/usr/local/include'])

@@ -67,6 +67,7 @@ def EnvDefaults(env):
             "LINKFLAGS_EXTRA",
             "LANG",
             "LC_CTYPE",
+            "PYTHON_LIB_PATH"
         ]
     )
 
@@ -98,6 +99,7 @@ def EnvDefaults(env):
         "GEM5PY_CCFLAGS_EXTRA": "",
         "GEM5PY_LINKFLAGS_EXTRA": "",
         "LINKFLAGS_EXTRA": "",
+        "PYTHON_LIB_PATH": "",
     }
     for key, default in var_overrides.items():
         env[key] = env["ENV"].get(key, default)
