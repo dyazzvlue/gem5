@@ -145,6 +145,9 @@ AddOption('--gprof', action='store_true',
           help='Enable support for the gprof profiler')
 AddOption('--pprof', action='store_true',
           help='Enable support for the pprof profiler')
+AddOption('--python_lib_path', dest='python_lib_path',default='',
+          help="python lib path")
+
 # Default to --no-duplicate-sources, but keep --duplicate-sources to opt-out
 # of this new build behaviour in case it introduces regressions. We could use
 # action=argparse.BooleanOptionalAction here once Python 3.9 is required.
@@ -410,10 +413,26 @@ for variant_path in variant_paths:
         # Enable -Wall and -Wextra and then disable the few warnings that
         # we consistently violate
         env.Append(CCFLAGS=['-Wall', '-Wundef', '-Wextra',
-                            '-Wno-sign-compare', '-Wno-unused-parameter'])
+                            '-Wno-sign-compare', '-Wno-unused-parameter',
+                            '-fno-lto'])
 
         # We always compile using C++17
         env.Append(CXXFLAGS=['-std=c++17'])
+        env.Append(CCFLAGS=['-flto'])
+        env.Append(CCFLAGS=['-fno-use-linker-plugin'])
+        env.Append(CCFLAGS=['-fno-lto'])
+        env.Append(CCFLAGS=['-fno-use-linker-plugin'])
+        env.Append(CXXFLAGS=['-fno-lto'])
+        env.Append(CXXFLAGS=['-fno-use-linker-plugin'])
+        env.Append(LINKFLAGS='-fno-lto')
+        
+        # for virtual python envirnment. The python lib path should be given
+        python_lib_path = GetOption("python_lib_path")
+        if python_lib_path:
+            env.Append(LIBPATH=[python_lib_path])
+        # Two possible python lib path in EC environment
+        # env.Append(LIBPATH=['/nfs/site/proj/dpg/arch/perfhome/python/miniconda37/lib/'])
+        # env.Append(LIBPATH=['/nfs/site/proj/dpg/arch/perfhome/python/miniconda/lib/'])
 
         if sys.platform.startswith('freebsd'):
             env.Append(CCFLAGS=['-I/usr/local/include'])

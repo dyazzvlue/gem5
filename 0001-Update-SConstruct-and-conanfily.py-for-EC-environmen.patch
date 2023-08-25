@@ -1,0 +1,564 @@
+From 05ead24a3283c50b6a6b711f6e54e2c1e9061857 Mon Sep 17 00:00:00 2001
+From: pzy <ziyang.peng@intel.com>
+Date: Fri, 25 Aug 2023 14:25:24 +0800
+Subject: [PATCH] Update SConstruct and conanfily.py for EC environment and add
+ cpuClusterId and SnoopGroupId
+
+---
+ .gitignore                       |   5 ++
+ SConstruct                       |  21 ++++-
+ conan_package/.gitignore         |   3 +
+ conan_package/clean_include.bash |  21 +++++
+ conanfile.py                     | 130 +++++++++++++++++++++++++++++++
+ src/base/types.hh                |  12 +++
+ src/mem/XBar.py                  |   1 +
+ src/mem/cache/Cache.py           |   5 ++
+ src/mem/cache/base.cc            |   4 +
+ src/mem/cache/base.hh            |   8 ++
+ src/mem/cache/cache.cc           |   2 +-
+ src/mem/coherent_xbar.cc         |   1 +
+ src/mem/coherent_xbar.hh         |  13 ++++
+ src/mem/packet.hh                |   3 +
+ src/mem/port.hh                  |  17 ++++
+ src/mem/request.hh               |  25 ++++++
+ src/sim/system.cc                |  15 ++++
+ src/sim/system.hh                |   3 +
+ 18 files changed, 287 insertions(+), 2 deletions(-)
+ create mode 100644 conan_package/.gitignore
+ create mode 100755 conan_package/clean_include.bash
+ create mode 100644 conanfile.py
+
+diff --git a/.gitignore b/.gitignore
+index 229a0d5ae9..b73990239d 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -32,3 +32,8 @@ configs/example/memcheck.cfg
+ configs/dram/lowp_sweep.cfg
+ .pyenv
+ .vscode
++conan.lock
++conanbuildinfo.txt
++conaninfo.txt
++graph_info.json
++SConscript_conan
+diff --git a/SConstruct b/SConstruct
+index 4fe2f64366..3c56520afc 100755
+--- a/SConstruct
++++ b/SConstruct
+@@ -145,6 +145,9 @@ AddOption('--gprof', action='store_true',
+           help='Enable support for the gprof profiler')
+ AddOption('--pprof', action='store_true',
+           help='Enable support for the pprof profiler')
++AddOption('--python_lib_path', dest='python_lib_path',default='',
++          help="python lib path")
++
+ # Default to --no-duplicate-sources, but keep --duplicate-sources to opt-out
+ # of this new build behaviour in case it introduces regressions. We could use
+ # action=argparse.BooleanOptionalAction here once Python 3.9 is required.
+@@ -410,10 +413,26 @@ for variant_path in variant_paths:
+         # Enable -Wall and -Wextra and then disable the few warnings that
+         # we consistently violate
+         env.Append(CCFLAGS=['-Wall', '-Wundef', '-Wextra',
+-                            '-Wno-sign-compare', '-Wno-unused-parameter'])
++                            '-Wno-sign-compare', '-Wno-unused-parameter',
++                            '-fno-lto'])
+ 
+         # We always compile using C++17
+         env.Append(CXXFLAGS=['-std=c++17'])
++        env.Append(CCFLAGS=['-flto'])
++        env.Append(CCFLAGS=['-fno-use-linker-plugin'])
++        env.Append(CCFLAGS=['-fno-lto'])
++        env.Append(CCFLAGS=['-fno-use-linker-plugin'])
++        env.Append(CXXFLAGS=['-fno-lto'])
++        env.Append(CXXFLAGS=['-fno-use-linker-plugin'])
++        env.Append(LINKFLAGS='-fno-lto')
++        
++        # for virtual python envirnment. The python lib path should be given
++        python_lib_path = GetOption("python_lib_path")
++        if python_lib_path:
++            env.Append(LIBPATH=[python_lib_path])
++        # Two possible python lib path in EC environment
++        # env.Append(LIBPATH=['/nfs/site/proj/dpg/arch/perfhome/python/miniconda37/lib/'])
++        # env.Append(LIBPATH=['/nfs/site/proj/dpg/arch/perfhome/python/miniconda/lib/'])
+ 
+         if sys.platform.startswith('freebsd'):
+             env.Append(CCFLAGS=['-I/usr/local/include'])
+diff --git a/conan_package/.gitignore b/conan_package/.gitignore
+new file mode 100644
+index 0000000000..a9b2b5817a
+--- /dev/null
++++ b/conan_package/.gitignore
+@@ -0,0 +1,3 @@
++*.so
++include/*
++lib/*
+diff --git a/conan_package/clean_include.bash b/conan_package/clean_include.bash
+new file mode 100755
+index 0000000000..e66bb7d378
+--- /dev/null
++++ b/conan_package/clean_include.bash
+@@ -0,0 +1,21 @@
++#!/bin/bash
++mkdir lib
++cd include
++find -name "*.pyo" -delete
++find -name "*.os" -delete
++find -name "*SConscript" -delete
++find -name "*.py" -delete
++find -name "*.o" -delete
++find -name "gem5py*" -delete
++find -name "gem5.opt*" -delete
++for gem5_lib in $(find -name "libgem5_opt.so")
++do
++    mv $gem5_lib ../lib
++done
++for link in $(find ./ -type l)
++do
++    loc=$(dirname $link)
++    dir=$(readlink -f $link)
++    rm $link
++    cp $dir $link -rf
++done
+\ No newline at end of file
+diff --git a/conanfile.py b/conanfile.py
+new file mode 100644
+index 0000000000..5ca8d5f39f
+--- /dev/null
++++ b/conanfile.py
+@@ -0,0 +1,130 @@
++import re
++import sys
++import os
++from conans import ConanFile, tools
++from os.path import isdir
++
++# This conan file is used to build gem5 simulator or gem5 shared library
++# You can use below commands to build.
++
++# python3 `which conan` create . demo/testing -o python_config="/usr/local/bin/python3-config"
++
++# For virtual python environment, the scons path and python lib path might by given
++# conan create . demo/tesing  \
++#    -o python_lib_path="/nfs/site/proj/dpg/arch/perfhome/python/miniconda37/lib/" \
++#    -o scons_path="/nfs/pdx/home/ziyangpe/.local/bin/scons"
++
++class Gem5Conan(ConanFile):
++    name = 'gem5'
++    description = 'Gem5 Simulator'
++    settings = "os", "compiler", "build_type", "arch"
++    options = {
++        "fPIC": [True, False],
++        "CONANPKG": ["ON", "OFF"],
++        "buildGem5": [True, False],
++        "buildLib": [True, False],
++        "shared": [True, False],
++        "buildvariants": ["debug", "opt", "fast"],
++        "isa": ["RISCV", "ARM", "X86"],  # Other valid ISAS: MIPS, POWER, SPARC
++        "cxxconfig": [True, False],
++        "tcmalloc": [True, False],
++        "systemc": [True, False],
++        "duplicate_sources": [True, False],
++        "python_config": "ANY",
++        "scons_path": "ANY",
++        "python_lib_path": "ANY"
++    }
++    default_options = {
++        "fPIC": True,
++        "CONANPKG": "OFF",
++        "buildGem5": True,
++        "buildLib": False,
++        "shared": True,
++        "buildvariants": "opt",
++        "isa": "ARM",
++        "cxxconfig": True,
++        "tcmalloc": False,
++        "systemc": False,
++        "duplicate_sources": False,
++        "python_config": "",
++        "scons_path": "",
++        "python_lib_path": ""
++    }
++    requires = ()
++    version = "1.0"
++    url = "https://gitlab.devtools.intel.com/syssim/cofluent" # TODO
++    license = "Proprietary"
++    exports_sources = (
++        "include/*",
++        "src/*",
++        "lib/*"
++    )
++
++    generators = "scons"
++
++    def build(self):
++        build_dir = "build/" + str(self.options.isa)
++        print("build_dir: ", build_dir)
++        if not isdir(build_dir):
++            os.makedirs(build_dir)
++        build_tool = "scons"
++        if self.options.scons_path != "" :
++            # using named scons
++            build_tool = str(self.options.scons_path)
++        print("Using build tool: ", build_tool)
++        # Set the building config
++        # build_config = "-default=" + str(self.options.isa)
++        build_config = ""
++        build_config += ' --with-cxx-config' if self.options.cxxconfig == True else ''
++        build_config += ' --without-tcmalloc' if self.options.tcmalloc == False else ''
++        build_config += ' USE_SYSTEMC=0' if self.options.systemc == False else ''
++        if self.options.python_lib_path != "":
++            # using given python lib
++            python_lib_path = ' --python_lib_path=' + str(self.options.python_lib_path)
++            build_config += python_lib_path
++        if self.options.python_config != "" :
++            # using named python
++            PYTHON_CONFIG = ' PYTHON_CONFIG=' + str(self.options.python_config)
++            build_config += PYTHON_CONFIG
++
++        if (self.options.buildGem5):
++            with tools.chdir(build_dir):
++                # just build basic gem5
++                build_config += ' --duplicate-sources' if self.options.duplicate_sources == True else ''
++                build_target = "gem5." + str(self.options.buildvariants)
++                print("build_target: ", build_target)
++                self.run('{} {} -u {} -j4'.format(build_tool, build_config, build_target))
++
++        if (self.options.buildLib == True):
++            build_lib_target = ""
++            if (self.options.shared == True):  # recommended
++                build_lib_target = "libgem5_opt.so"
++                # For MAC / OSX this command should be used
++                # build_lib_target = "libgem5_opt.dylib"
++            else:
++                build_lib_target = "libgem5_opt.a"
++            with tools.chdir(build_dir):
++                # build gem5 lib
++                build_config += ' --duplicate-sources' # Otherwise, the header file will not in the include folder
++                print("build_target: ", build_lib_target)
++                self.run('{} {} -u {} -j4'.format(build_tool, build_config, build_lib_target))
++
++    def package(self):
++        isa = str(self.options.isa)
++        build_dir = "build/" + isa + "/"
++        cp_cmd = "cp -r " + build_dir + " conan_package/"
++        os.system(cp_cmd)
++        with tools.chdir("conan_package/"):
++            rename_cmd = "mv " + isa + "/ include"
++            os.system(rename_cmd)
++            os.system("cp -r ../ext/gdbremote include/")
++            os.system("./clean_include.bash")
++           
++            self.copy("*", dst = "include", src="include")
++            self.copy("*.a", dst = "lib", keep_path=False)
++            self.copy("*.so", dst = "lib", src="lib")
++
++    def package_info(self):
++        self.cpp_info.name = "gem5_shared_lib"
++        self.cpp_info.components["libgem5_opt"].libs = ["gem5_opt"]
++        
+diff --git a/src/base/types.hh b/src/base/types.hh
+index 913455fca0..d67a5bf813 100644
+--- a/src/base/types.hh
++++ b/src/base/types.hh
+@@ -245,6 +245,18 @@ const ContextID InvalidContextID = (ContextID)-1;
+ typedef int16_t PortID;
+ const PortID InvalidPortID = (PortID)-1;
+ 
++/**
++ * Snoop group index. For each ports in same snoop_group, snoop filter will 
++ * send snoop request if snooping is required.
++ * 
++ */
++
++typedef int16_t SnoopGroupID;
++const SnoopGroupID DefaultSnoopGroupID = SnoopGroupID(-1);
++
++typedef int16_t CpuClusterID;
++const CpuClusterID InvalidCpuClusterID = CpuClusterID(-1);
++
+ class FaultBase;
+ typedef std::shared_ptr<FaultBase> Fault;
+ 
+diff --git a/src/mem/XBar.py b/src/mem/XBar.py
+index d0becc22a8..582f51ea4d 100644
+--- a/src/mem/XBar.py
++++ b/src/mem/XBar.py
+@@ -140,6 +140,7 @@ class CoherentXBar(BaseXBar):
+ 
+     system = Param.System(Parent.any, "System that the crossbar belongs to.")
+ 
++    snoop_group_id = Param.Int(-1, "Snoop group id")
+ 
+ class SnoopFilter(SimObject):
+     type = "SnoopFilter"
+diff --git a/src/mem/cache/Cache.py b/src/mem/cache/Cache.py
+index 49665dde91..dc7dfebfcf 100644
+--- a/src/mem/cache/Cache.py
++++ b/src/mem/cache/Cache.py
+@@ -173,11 +173,15 @@ class BaseCache(ClockedObject):
+     # data cache.
+     write_allocator = Param.WriteAllocator(NULL, "Write allocator")
+ 
++    # cpu sluster id 
++    cpu_cluster_id = Param.Int(-1, "Id of related cpu_cluster")
++    snoop_group_id = Param.Int(-1, "Snoop group id")
+ 
+ class Cache(BaseCache):
+     type = "Cache"
+     cxx_header = "mem/cache/cache.hh"
+     cxx_class = "gem5::Cache"
++    cpu_cluster_id = 0
+ 
+ 
+ class NoncoherentCache(BaseCache):
+@@ -188,3 +192,4 @@ class NoncoherentCache(BaseCache):
+     # This is typically a last level cache and any clean
+     # writebacks would be unnecessary traffic to the main memory.
+     writeback_clean = False
++    cpu_cluster_id = 0
+diff --git a/src/mem/cache/base.cc b/src/mem/cache/base.cc
+index 87c44cefb7..9383f70c27 100644
+--- a/src/mem/cache/base.cc
++++ b/src/mem/cache/base.cc
+@@ -110,6 +110,8 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
+       noTargetMSHR(nullptr),
+       missCount(p.max_miss_count),
+       addrRanges(p.addr_ranges.begin(), p.addr_ranges.end()),
++      cpuClusterId(p.cpu_cluster_id),
++      snoopGroupId(p.snoop_group_id),
+       system(p.system),
+       stats(*this)
+ {
+@@ -1701,6 +1703,7 @@ BaseCache::writebackBlk(CacheBlk *blk)
+ 
+     RequestPtr req = std::make_shared<Request>(
+         regenerateBlkAddr(blk), blkSize, 0, Request::wbRequestorId);
++    req->setCpuClusterId(this->cpuClusterId);
+ 
+     if (blk->isSecure())
+         req->setFlags(Request::SECURE);
+@@ -1744,6 +1747,7 @@ BaseCache::writecleanBlk(CacheBlk *blk, Request::Flags dest, PacketId id)
+ {
+     RequestPtr req = std::make_shared<Request>(
+         regenerateBlkAddr(blk), blkSize, 0, Request::wbRequestorId);
++    req->setCpuClusterId(this->cpuClusterId);
+ 
+     if (blk->isSecure()) {
+         req->setFlags(Request::SECURE);
+diff --git a/src/mem/cache/base.hh b/src/mem/cache/base.hh
+index 8a06ec2c42..e849e3fa16 100644
+--- a/src/mem/cache/base.hh
++++ b/src/mem/cache/base.hh
+@@ -977,6 +977,14 @@ class BaseCache : public ClockedObject
+      * Normally this is all possible memory addresses. */
+     const AddrRangeList addrRanges;
+ 
++    /**
++     * The id of cpu cluster which this cache belongs to.
++     * Only used in tlm co-simulation
++     */
++    CpuClusterID cpuClusterId;
++
++    SnoopGroupID snoopGroupId;
++
+   public:
+     /** System we are currently operating in. */
+     System *system;
+diff --git a/src/mem/cache/cache.cc b/src/mem/cache/cache.cc
+index 24b3fe7219..149dfdc796 100644
+--- a/src/mem/cache/cache.cc
++++ b/src/mem/cache/cache.cc
+@@ -965,7 +965,7 @@ Cache::cleanEvictBlk(CacheBlk *blk)
+     // Creating a zero sized write, a message to the snoop filter
+     RequestPtr req = std::make_shared<Request>(
+         regenerateBlkAddr(blk), blkSize, 0, Request::wbRequestorId);
+-
++    req->setCpuClusterId(this->cpuClusterId);
+     if (blk->isSecure())
+         req->setFlags(Request::SECURE);
+ 
+diff --git a/src/mem/coherent_xbar.cc b/src/mem/coherent_xbar.cc
+index 8163299a09..7a0cc82f88 100644
+--- a/src/mem/coherent_xbar.cc
++++ b/src/mem/coherent_xbar.cc
+@@ -62,6 +62,7 @@ CoherentXBar::CoherentXBar(const CoherentXBarParams &p)
+       maxRoutingTableSizeCheck(p.max_routing_table_size),
+       pointOfCoherency(p.point_of_coherency),
+       pointOfUnification(p.point_of_unification),
++      snoopGroupId(p.snoop_group_id),
+ 
+       ADD_STAT(snoops, statistics::units::Count::get(), "Total snoops"),
+       ADD_STAT(snoopTraffic, statistics::units::Byte::get(), "Total snoop traffic"),
+diff --git a/src/mem/coherent_xbar.hh b/src/mem/coherent_xbar.hh
+index 454012db8f..af513da307 100644
+--- a/src/mem/coherent_xbar.hh
++++ b/src/mem/coherent_xbar.hh
+@@ -179,6 +179,16 @@ class CoherentXBar : public BaseXBar
+          */
+         bool isSnooping() const override { return true; }
+ 
++        /**
++         * @brief Get the Snooping Group Id object
++         * 
++         * @return SnoopGroupID 
++         */
++        SnoopGroupID getSnoopingGroupId() const override
++        {
++            return xbar.snoopGroupId;
++        }
++
+         bool
+         recvTimingResp(PacketPtr pkt) override
+         {
+@@ -299,6 +309,9 @@ class CoherentXBar : public BaseXBar
+     /** Is this crossbar the point of unification? **/
+     const bool pointOfUnification;
+ 
++    /** Snoop group id **/
++    const SnoopGroupID snoopGroupId;
++
+     /**
+      * Upstream caches need this packet until true is returned, so
+      * hold it for deletion until a subsequent call
+diff --git a/src/mem/packet.hh b/src/mem/packet.hh
+index ed7a94f4fb..7c80554fe9 100644
+--- a/src/mem/packet.hh
++++ b/src/mem/packet.hh
+@@ -778,6 +778,9 @@ class Packet : public Printable, public Extensible<Packet>
+     { _qosValue = qos_value; }
+ 
+     inline RequestorID requestorId() const { return req->requestorId(); }
++    inline CpuClusterID cpuClusterId() const { return req->cpuClusterId(); }
++
++    inline bool hasCpuClusterId() const { return req->hasCpuClusterId(); }
+ 
+     // Network error conditions... encapsulate them as methods since
+     // their encoding keeps changing (from result field to command
+diff --git a/src/mem/port.hh b/src/mem/port.hh
+index 2555706444..68509563ce 100644
+--- a/src/mem/port.hh
++++ b/src/mem/port.hh
+@@ -158,6 +158,20 @@ class RequestPort: public Port, public AtomicRequestProtocol,
+      */
+     virtual bool isSnooping() const { return false; }
+ 
++    /**
++     * @brief Get the Snooping Group Id object
++     * Get the Snooping group id if is set. The default implementation return
++     * -1 and thus tells the neighbour that snoop all the related ports. Any
++     * request port that want to receive snoop requests in named range ports has
++     * to override this function(e.g. cache and coherenceXbar)
++     * 
++     * @return int 
++     */
++    virtual SnoopGroupID getSnoopingGroupId() const 
++    { 
++        return DefaultSnoopGroupID; 
++    }
++
+     /**
+      * Get the address ranges of the connected responder port.
+      */
+@@ -358,6 +372,9 @@ class ResponsePort : public Port, public AtomicResponseProtocol,
+      */
+     bool isSnooping() const { return _requestPort->isSnooping(); }
+ 
++    SnoopGroupID getSnoopingGroupId() const 
++    { return _requestPort->getSnoopingGroupId(); }
++
+     /**
+      * Called by the owner to send a range change
+      */
+diff --git a/src/mem/request.hh b/src/mem/request.hh
+index 491aad0241..f071e661a7 100644
+--- a/src/mem/request.hh
++++ b/src/mem/request.hh
+@@ -400,6 +400,13 @@ class Request : public Extensible<Request>
+      */
+     RequestorID _requestorId = invldRequestorId;
+ 
++    /**
++     * Cluster id used in tlm co-simulation, in order to track where the 
++     * write back requests come from.
++     *
++     */
++    CpuClusterID _cpuClusterId = InvalidCpuClusterID;
++
+     /** Flag structure for the request. */
+     Flags _flags;
+ 
+@@ -843,6 +850,24 @@ class Request : public Extensible<Request>
+     {
+         return _requestorId;
+     }
++    /** Accesssor for the core cluster id */
++    CpuClusterID
++    cpuClusterId() const
++    {
++        return _cpuClusterId;
++    }
++
++    void
++    setCpuClusterId(CpuClusterID id)
++    {
++        _cpuClusterId = id;
++    }
++
++    bool
++    hasCpuClusterId()
++    {
++        return (_cpuClusterId != InvalidCpuClusterID);
++    }
+ 
+     void
+     requestorId(RequestorID rid)
+diff --git a/src/sim/system.cc b/src/sim/system.cc
+index 806eca3ddf..e393520cc2 100644
+--- a/src/sim/system.cc
++++ b/src/sim/system.cc
+@@ -502,6 +502,8 @@ System::_getRequestorId(const SimObject* requestor,
+ 
+     // Generate a new RequestorID incrementally
+     RequestorID requestor_id = requestors.size();
++    std::cerr << "System create requestor id: " << requestor_id 
++        << " to object " << name << std::endl; 
+ 
+     // Append the new Requestor metadata to the group of system Requestors.
+     requestors.emplace_back(requestor, name, requestor_id);
+@@ -509,6 +511,19 @@ System::_getRequestorId(const SimObject* requestor,
+     return requestors.back().id;
+ }
+ 
++// TODO check if has multiple system
++RequestorID getRequestorId(const SimObject* requestor,
++                         std::string subrequestor={})
++{
++    std::vector<System *>::iterator i = System::systemList.begin();
++    std::vector<System *>::iterator end = System::systemList.end();
++    for (; i != end; ++i) {
++        System *sys = *i;
++        return sys->getRequestorId(requestor, subrequestor);
++    }
++    return -1;
++}
++
+ std::string
+ System::leafRequestorName(const SimObject* requestor,
+                        const std::string& subrequestor)
+diff --git a/src/sim/system.hh b/src/sim/system.hh
+index d2725c32a9..836656c954 100644
+--- a/src/sim/system.hh
++++ b/src/sim/system.hh
+@@ -614,6 +614,9 @@ class System : public SimObject, public PCEventScope
+ 
+ void printSystems();
+ 
++RequestorID getRequestorId(const SimObject* requestor,
++                         std::string subrequestor);
++
+ } // namespace gem5
+ 
+ #endif // __SYSTEM_HH__
+-- 
+2.20.1
+

@@ -32,3 +32,8 @@ configs/example/memcheck.cfg
 configs/dram/lowp_sweep.cfg
 .pyenv
 .vscode
+conan.lock
+conanbuildinfo.txt
+conaninfo.txt
+graph_info.json
+SConscript_conan

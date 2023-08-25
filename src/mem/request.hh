@@ -400,6 +400,13 @@ class Request : public Extensible<Request>
      */
     RequestorID _requestorId = invldRequestorId;
 
+    /**
+     * Cluster id used in tlm co-simulation, in order to track where the 
+     * write back requests come from.
+     *
+     */
+    CpuClusterID _cpuClusterId = InvalidCpuClusterID;
+
     /** Flag structure for the request. */
     Flags _flags;
 
@@ -842,6 +849,24 @@ class Request : public Extensible<Request>
     requestorId() const
     {
         return _requestorId;
+    }
+    /** Accesssor for the core cluster id */
+    CpuClusterID
+    cpuClusterId() const
+    {
+        return _cpuClusterId;
+    }
+
+    void
+    setCpuClusterId(CpuClusterID id)
+    {
+        _cpuClusterId = id;
+    }
+
+    bool
+    hasCpuClusterId()
+    {
+        return (_cpuClusterId != InvalidCpuClusterID);
     }
 
     void

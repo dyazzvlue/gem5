@@ -977,6 +977,14 @@ class BaseCache : public ClockedObject
      * Normally this is all possible memory addresses. */
     const AddrRangeList addrRanges;
 
+    /**
+     * The id of cpu cluster which this cache belongs to.
+     * Only used in tlm co-simulation
+     */
+    CpuClusterID cpuClusterId;
+
+    SnoopGroupID snoopGroupId;
+
   public:
     /** System we are currently operating in. */
     System *system;

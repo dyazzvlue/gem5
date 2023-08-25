@@ -502,11 +502,26 @@ System::_getRequestorId(const SimObject* requestor,
 
     // Generate a new RequestorID incrementally
     RequestorID requestor_id = requestors.size();
+    std::cerr << "System create requestor id: " << requestor_id 
+        << " to object " << name << std::endl; 
 
     // Append the new Requestor metadata to the group of system Requestors.
     requestors.emplace_back(requestor, name, requestor_id);
 
     return requestors.back().id;
+}
+
+// TODO check if has multiple system
+RequestorID getRequestorId(const SimObject* requestor,
+                         std::string subrequestor={})
+{
+    std::vector<System *>::iterator i = System::systemList.begin();
+    std::vector<System *>::iterator end = System::systemList.end();
+    for (; i != end; ++i) {
+        System *sys = *i;
+        return sys->getRequestorId(requestor, subrequestor);
+    }
+    return -1;
 }
 
 std::string

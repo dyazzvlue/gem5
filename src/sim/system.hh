@@ -614,6 +614,9 @@ class System : public SimObject, public PCEventScope
 
 void printSystems();
 
+RequestorID getRequestorId(const SimObject* requestor,
+                         std::string subrequestor);
+
 } // namespace gem5
 
 #endif // __SYSTEM_HH__
